@@ -1,0 +1,53 @@
+name: 'Setup PHP and Composer'
+description: 'Setup PHP and install Composer dependencies with caching'
+
+inputs:
+  php-version:
+    description: 'PHP version to use'
+    required: false
+    default: '8.3'
+  coverage:
+    description: 'Coverage driver to use (none, xdebug, pcov)'
+    required: false
+    default: 'none'
+  stability:
+    description: 'Composer stability preference (prefer-stable, prefer-lowest)'
+    required: false
+    default: 'prefer-stable'
+  extensions:
+    description: 'PHP extensions to install'
+    required: false
+    default: 'dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.php-version }}
+        coverage: ${{ inputs.coverage }}
+        extensions: ${{ inputs.extensions }}
+
+    - name: Get Composer Cache Directory
+      id: composer-cache
+      shell: bash
+      run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+    - name: Cache Composer dependencies
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ inputs.stability }}-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-composer-${{ inputs.stability }}-
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        if [ "${{ inputs.stability }}" = "prefer-lowest" ]; then
+          composer update --prefer-lowest --prefer-dist --no-interaction --no-progress
+        else
+          composer install --prefer-dist --no-interaction --no-progress
+        fi
+

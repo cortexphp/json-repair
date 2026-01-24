@@ -1,0 +1,7 @@
+vendor
+composer.lock
+.vscode
+.env
+.DS_Store
+.phpstan-cache
+coverage

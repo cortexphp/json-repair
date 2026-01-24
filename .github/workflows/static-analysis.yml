@@ -1,0 +1,73 @@
+name: Static Analysis
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on: [push]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phpstan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP and Composer
+        uses: ./.github/actions/setup-php-composer
+
+      - name: Cache phpstan results
+        uses: actions/cache@v5
+        with:
+          path: .phpstan-cache
+          key: "result-cache-${{ github.run_id }}" # always write a new cache
+          restore-keys: |
+            result-cache-
+
+      - name: Run phpstan
+        run: vendor/bin/phpstan analyse -c phpstan.dist.neon --no-progress --error-format=github
+
+  type-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP and Composer
+        uses: ./.github/actions/setup-php-composer
+
+      - name: Check type coverage
+        run: vendor/bin/pest --type-coverage --min=100
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP and Composer
+        uses: ./.github/actions/setup-php-composer
+
+      - name: Cache rector results
+        uses: actions/cache@v5
+        with:
+          path: /tmp/rector
+          key: "rector-cache-${{ github.run_id }}" # always write a new cache
+          restore-keys: |
+            rector-cache-
+
+      - name: Cache ecs results
+        uses: actions/cache@v5
+        with:
+          path: /tmp/ecs
+          key: "ecs-cache-${{ github.run_id }}" # always write a new cache
+          restore-keys: |
+            ecs-cache-
+
+      - name: Run format checks
+        run: composer format --no-progress-bar

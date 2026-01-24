@@ -1,0 +1,47 @@
+name: Tests
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on: [push]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        php: [8.3, 8.4, 8.5]
+        stability: [prefer-lowest, prefer-stable]
+
+    name: PHP${{ matrix.php }} - ${{ matrix.stability }} - ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP and Composer
+        uses: ./.github/actions/setup-php-composer
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: pcov
+          stability: ${{ matrix.stability }}
+
+      - name: Setup problem matchers
+        run: |
+          echo "::add-matcher::${{ runner.tool_cache }}/php.json"
+          echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+
+      - name: Execute tests with mutation
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: vendor/bin/pest --colors=always --mutate --parallel --min=80
+
+      - name: Execute tests
+        if: ${{ matrix.os != 'ubuntu-latest' }}
+        run: vendor/bin/pest --colors=always
