@@ -19,8 +19,8 @@ composer require cortexphp/json-repair
 ```php
 use Cortex\JsonRepair\JsonRepair;
 
-// Repair broken JSON
-$broken = "{'name': 'John', age: 30, active: True}";
+// Repair broken JSON (single quotes, unquoted keys, trailing comma, non-standard booleans)
+$broken = "{'name': 'John', age: 30, active: true,}";
 $repaired = (new JsonRepair($broken))->repair();
 // {"name": "John", "age": 30, "active": true}
 
