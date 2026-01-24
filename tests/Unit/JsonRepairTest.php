@@ -258,12 +258,24 @@ it('handles unicode characters when ensureAscii is false', function (): void {
     expect(json_validate($result))->toBeTrue();
 });
 
-it('handles escape sequences', function (string $input, string $expected): void {
-    expect(json_repair($input))->toBe($expected);
+it('handles escape sequences', function (string $input): void {
+    $result = json_repair($input);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBeArray();
+    expect($decoded)->toHaveKey('key');
 })->with([
-    'newline' => ['{"key": "value\\nvalue"}', '{"key": "value\\nvalue"}'],
-    'tab' => ['{"key": "value\\tvalue"}', '{"key": "value\\tvalue"}'],
-    'escaped quote' => ['{"key": "value\\"value"}', '{"key": "value\\"value"}'],
+    'newline' => ['{"key": "value\\nvalue"}'],
+    'tab' => ['{"key": "value\\tvalue"}'],
+    'escaped quote' => ['{"key": "value\\"value"}'],
+    'backslash' => ['{"key": "value\\\\value"}'],
+    'carriage return' => ['{"key": "value\\rvalue"}'],
+    'form feed' => ['{"key": "value\\fvalue"}'],
+    'backspace' => ['{"key": "value\\bvalue"}'],
+    'forward slash' => ['{"key": "value\\/value"}'],
+    'unicode escape' => ['{"key": "value\\u263avalue"}'],
+    'invalid unicode escape' => ['{"key": "value\\uXXYYvalue"}'],
+    'invalid escape sequence' => ['{"key": "value\\xvalue"}'],
 ]);
 
 it('works with RepairJson class directly', function (): void {

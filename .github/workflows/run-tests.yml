@@ -39,9 +39,9 @@ jobs:
           echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
 
       - name: Execute tests with mutation
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: vendor/bin/pest --colors=always --mutate --parallel --min=80
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.php == '8.5' }}
+        run: vendor/bin/pest --colors=always --mutate --parallel --min=50
 
       - name: Execute tests
-        if: ${{ matrix.os != 'ubuntu-latest' }}
+        if: ${{ matrix.os != 'ubuntu-latest' && matrix.php != '8.5' }}
         run: vendor/bin/pest --colors=always

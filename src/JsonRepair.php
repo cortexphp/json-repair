@@ -30,6 +30,9 @@ class JsonRepair
 
     private string $output = '';
 
+    /**
+     * @var array<string>
+     */
     private array $stack = [];
 
     private bool $inString = false;
@@ -71,6 +74,8 @@ class JsonRepair
             $char = $json[$i];
             $this->pos = $i;
 
+            // Handle escape sequences in strings
+            // @phpstan-ignore identical.alwaysFalse (state changes in loop iterations)
             if ($this->state === self::STATE_IN_STRING_ESCAPE) {
                 $this->handleEscapeSequence($char);
                 $this->state = self::STATE_IN_STRING;
@@ -78,7 +83,10 @@ class JsonRepair
                 continue;
             }
 
+            // Handle characters inside strings
+            // @phpstan-ignore identical.alwaysFalse (state changes in loop iterations)
             if ($this->state === self::STATE_IN_STRING) {
+                // @phpstan-ignore identical.alwaysFalse (delimiter set when entering string state)
                 if ($char === $this->stringDelimiter) {
                     // Always close with double quote, even if opened with single quote
                     $this->output .= '"';
@@ -107,73 +115,66 @@ class JsonRepair
                 continue;
             }
 
-            switch ($this->state) {
-                case self::STATE_START:
-                    $i = $this->handleStart($json, $i);
-                    break;
-
-                case self::STATE_IN_OBJECT_KEY:
-                    $i = $this->handleObjectKey($json, $i);
-                    break;
-
-                case self::STATE_EXPECTING_COLON:
-                    $i = $this->handleExpectingColon($json, $i);
-                    break;
-
-                case self::STATE_IN_OBJECT_VALUE:
-                    $i = $this->handleObjectValue($json, $i);
-                    break;
-
-                case self::STATE_IN_ARRAY:
-                    $i = $this->handleArrayValue($json, $i);
-                    break;
-
-                case self::STATE_EXPECTING_COMMA_OR_END:
-                    $i = $this->handleExpectingCommaOrEnd($json, $i);
-                    break;
-
-                case self::STATE_IN_NUMBER:
-                    $i = $this->handleNumber($json, $i);
-                    break;
-
-                default:
-                    $i++;
-            }
+            $i = match ($this->state) {
+                // @phpstan-ignore match.alwaysTrue (first iteration starts at STATE_START, then changes)
+                self::STATE_START => $this->handleStart($json, $i),
+                self::STATE_IN_OBJECT_KEY => $this->handleObjectKey($json, $i),
+                self::STATE_EXPECTING_COLON => $this->handleExpectingColon($json, $i),
+                self::STATE_IN_OBJECT_VALUE => $this->handleObjectValue($json, $i),
+                self::STATE_IN_ARRAY => $this->handleArrayValue($json, $i),
+                self::STATE_EXPECTING_COMMA_OR_END => $this->handleExpectingCommaOrEnd($json, $i),
+                self::STATE_IN_NUMBER => $this->handleNumber($json, $i),
+                default => $i + 1,
+            };
         }
 
         // Close any unclosed strings
+        // @phpstan-ignore if.alwaysFalse (can be true if string wasn't closed in loop)
         if ($this->inString) {
             $this->output .= '"';
         }
 
         // If we're in OBJECT_VALUE state and output ends with ':', add empty string
+        // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (state can change during loop)
         if ($this->state === self::STATE_IN_OBJECT_VALUE && str_ends_with($this->output, ':')) {
             $this->output .= '""';
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
         }
 
         // Close any unclosed brackets/braces
+        // @phpstan-ignore notIdentical.alwaysFalse (stack populated during loop execution)
         while ($this->stack !== []) {
             $expected = array_pop($this->stack);
 
+            // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (expected can be '}' from stack)
             if ($expected === '}' && str_ends_with($this->output, ':')) {
                 $this->output .= '""';
             }
 
-            $this->output .= $expected === '}' ? '}' : ']';
+            $this->output .= $expected;
         }
 
         if (! $this->ensureAscii) {
             $decoded = json_decode($this->output, true);
 
+            // @phpstan-ignore notIdentical.alwaysFalse (output can be valid JSON after repair)
             if ($decoded !== null) {
-                $this->output = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $encoded = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+                if ($encoded !== false) {
+                    $this->output = $encoded;
+                }
             }
         }
 
         return $this->output;
     }
 
+    /**
+     * @param int<1, max> $depth
+     *
+     * @return array<mixed>|object
+     */
     public function decode(
         int $depth = 512,
         int $flags = JSON_THROW_ON_ERROR,
@@ -186,11 +187,15 @@ class JsonRepair
 
     private function extractJsonFromMarkdown(string $input): string
     {
-        if (preg_match_all('/```json\s*([\s\S]*?)\s*```/', $input, $matches)) {
+        $matchCount = preg_match_all('/```json\s*([\s\S]*?)\s*```/', $input, $matches);
+
+        if ($matchCount > 0) {
             return implode('', $matches[1]);
         }
 
-        if (preg_match_all('/```\s*([\s\S]*?)\s*```/', $input, $matches)) {
+        $matchCount = preg_match_all('/```\s*([\s\S]*?)\s*```/', $input, $matches);
+
+        if ($matchCount > 0) {
             return implode('', $matches[1]);
         }
 
@@ -415,7 +420,9 @@ class JsonRepair
         }
 
         // Handle non-standard booleans/null (True/False/None)
-        if (preg_match('/^(true|false|null|True|False|None)\b/i', substr($json, $i), $matches)) {
+        $matchResult = preg_match('/^(true|false|null|True|False|None)\b/i', substr($json, $i), $matches);
+
+        if ($matchResult === 1) {
             $this->output .= $this->normalizeBoolean($matches[1]);
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
 
@@ -480,7 +487,9 @@ class JsonRepair
         }
 
         // Handle non-standard booleans/null (True/False/None)
-        if (preg_match('/^(true|false|null|True|False|None)\b/i', substr($json, $i), $matches)) {
+        $matchResult = preg_match('/^(true|false|null|True|False|None)\b/i', substr($json, $i), $matches);
+
+        if ($matchResult === 1) {
             $this->output .= $this->normalizeBoolean($matches[1]);
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
 
@@ -502,9 +511,9 @@ class JsonRepair
         $char = $json[$i];
         $top = end($this->stack);
 
-        if ($char === $top) {
+        if ($top !== false && $char === $top) {
             $this->removeTrailingComma();
-            $this->output .= $top === '}' ? '}' : ']';
+            $this->output .= $top;
             array_pop($this->stack);
             $this->state = $this->stack === [] ? self::STATE_START : self::STATE_EXPECTING_COMMA_OR_END;
 
@@ -534,7 +543,7 @@ class JsonRepair
         $length = strlen($json);
 
         // Handle sign
-        if ($json[$i] === '-' || $json[$i] === '+') {
+        if ($i < $length && ($json[$i] === '-' || $json[$i] === '+')) {
             $this->output .= $json[$i];
             $i++;
         }
