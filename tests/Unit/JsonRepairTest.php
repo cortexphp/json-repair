@@ -8,6 +8,8 @@ use Cortex\JsonRepair\JsonRepair;
 
 use function Cortex\JsonRepair\json_repair;
 
+covers(JsonRepair::class);
+
 it('passes through valid JSON unchanged', function (string $json): void {
     $result = json_repair($json);
     expect(json_validate($result))->toBeTrue();
