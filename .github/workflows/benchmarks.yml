@@ -1,0 +1,43 @@
+name: Benchmarks
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark-smoke-test:
+    runs-on: ubuntu-latest
+
+    # Only run on one PHP version to save CI time
+    # Benchmarks are for manual performance analysis, not CI validation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP and Composer
+        uses: ./.github/actions/setup-php-composer
+        with:
+          php-version: 8.5
+          stability: prefer-stable
+
+      - name: Run benchmark smoke test
+        # Run with fewer iterations/revs for CI speed
+        # Just verify benchmarks execute without errors
+        run: |
+          vendor/bin/phpbench run \
+            --iterations=3 \
+            --revs=10 \
+            --warmup=1 \
+            --progress=verbose \
+            --output=verbose

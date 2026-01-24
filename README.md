@@ -17,7 +17,31 @@ composer require cortexphp/json-repair
 ## Quick Start
 
 ```php
-// TODO
+use Cortex\JsonRepair\JsonRepair;
+
+// Repair broken JSON
+$broken = "{'name': 'John', age: 30, active: True}";
+$repaired = (new JsonRepair($broken))->repair();
+// {"name": "John", "age": 30, "active": true}
+
+// Or use the helper function
+$repaired = json_repair($broken);
+
+// Repair and decode in one step
+$data = (new JsonRepair($broken))->decode();
+// ['name' => 'John', 'age' => 30, 'active' => true]
+
+// Or use the helper function
+$data = json_repair_decode($broken);
+// ['name' => 'John', 'age' => 30, 'active' => true]
+```
+
+## Benchmarking
+
+Run performance benchmarks using PHPBench:
+
+```bash
+composer run benchmark
 ```
 
 ## Documentation

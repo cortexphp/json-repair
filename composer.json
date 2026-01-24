@@ -21,6 +21,7 @@
     "require-dev": {
         "pestphp/pest": "^4.1.4",
         "pestphp/pest-plugin-type-coverage": "^4.0.3",
+        "phpbench/phpbench": "^1.4",
         "phpstan/phpstan": "^2.1.32",
         "phpstan/phpstan-strict-rules": "^2.0",
         "rector/rector": "^2.2",
@@ -41,6 +42,7 @@
     },
     "scripts": {
         "test": "pest",
+        "benchmark": "phpbench run",
         "ecs": "ecs check --fix",
         "rector": "rector process",
         "stan": "phpstan analyse",

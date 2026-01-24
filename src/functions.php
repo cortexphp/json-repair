@@ -18,3 +18,24 @@ function json_repair(string $json, bool $ensureAscii = true): string
 
     return $repairer->repair();
 }
+
+/**
+ * Repair and decode a broken JSON string.
+ *
+ * @param string $json The JSON string to repair and decode
+ * @param int<1, max> $depth Maximum nesting depth of the structure being decoded
+ * @param int $flags Bitmask of JSON decode flags (default: JSON_THROW_ON_ERROR)
+ * @param bool $ensureAscii Whether to escape non-ASCII characters (default: true)
+ *
+ * @return array<mixed>|object The decoded JSON data
+ */
+function json_repair_decode(
+    string $json,
+    int $depth = 512,
+    int $flags = JSON_THROW_ON_ERROR,
+    bool $ensureAscii = true,
+): array|object {
+    $repairer = new JsonRepair($json, $ensureAscii);
+
+    return $repairer->decode($depth, $flags);
+}
