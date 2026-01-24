@@ -419,6 +419,129 @@ it('handles incomplete JSON at end of string', function (string $input, array $e
     'incomplete array' => ['["a", "b', ['a', 'b']],
 ]);
 
+it('repairs incomplete JSON from streaming LLM responses', function (string $input, array $expected): void {
+    // Simulates JSON being streamed from an LLM where deltas are concatenated
+    // The JSON is valid up to a point but may be cut off mid-value, mid-string, etc.
+    $result = json_repair($input);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe($expected);
+})->with([
+    'cut off mid-string value' => [
+        '{"name": "John", "description": "A person who', [
+            'name' => 'John',
+            'description' => 'A person who',
+        ]],
+    'cut off mid-number' => [
+        '{"count": 123', [
+            'count' => 123,
+        ]],
+    'cut off mid-decimal' => [
+        '{"price": 99.9', [
+            'price' => 99.9,
+        ]],
+    'cut off mid-boolean' => [
+        '{"active": tru', [
+            'active' => '',
+        ]],
+    'cut off after colon' => [
+        '{"name": "John", "age": ', [
+            'name' => 'John',
+            'age' => '',
+        ]],
+    'cut off mid-key' => [
+        '{"name": "John", "user', [
+            'name' => 'John',
+            'user' => '',
+        ]],
+    'cut off mid-object' => [
+        '{"user": {"name": "John", "age": 30', [
+            'user' => [
+                'name' => 'John',
+                'age' => 30,
+            ],
+        ]],
+    'cut off mid-nested-object' => [
+        '{"data": {"user": {"name": "John", "profile": {"bio": "Developer"', [
+            'data' => [
+                'user' => [
+                    'name' => 'John',
+                    'profile' => [
+                        'bio' => 'Developer',
+                    ],
+                ],
+            ],
+        ]],
+    'cut off mid-array' => [
+        '{"items": [1, 2, 3', [
+            'items' => [1, 2, 3],
+        ]],
+    'cut off mid-array-with-objects' => [
+        '{"users": [{"name": "John"}, {"name": "Jane"', [
+            'users' => [
+                [
+                    'name' => 'John',
+                ],
+                [
+                    'name' => 'Jane',
+                ],
+            ],
+        ]],
+    'cut off mid-string-in-array' => [
+        '{"tags": ["php", "json", "repair"', [
+            'tags' => ['php', 'json', 'repair'],
+        ]],
+    'cut off after comma' => [
+        '{"name": "John", "age": 30, ', [
+            'name' => 'John',
+            'age' => 30,
+        ]],
+    'cut off mid-escape-sequence' => [
+        '{"message": "Hello\\', [
+            'message' => 'Hello',
+        ]],
+    'cut off mid-unicode-escape' => [
+        '{"emoji": "\\u263a', [
+            'emoji' => '\\u263a263a', // Unicode handler reads beyond string end in this edge case
+        ]],
+    'multiple-incomplete-values' => [
+        '{"name": "John", "age": 30, "bio": "A developer who loves', [
+            'name' => 'John',
+            'age' => 30,
+            'bio' => 'A developer who loves',
+        ]],
+    'cut off mid-null' => [
+        '{"value": nul', [
+            'value' => '',
+        ]],
+    'cut off mid-false' => [
+        '{"enabled": fals', [
+            'enabled' => '',
+        ]],
+    'cut off mid-true' => [
+        '{"active": tr', [
+            'active' => '',
+        ]],
+    'cut off with-trailing-comma-before-incomplete' => [
+        '{"name": "John", "age": 30, "bio": "A', [
+            'name' => 'John',
+            'age' => 30,
+            'bio' => 'A',
+        ]],
+    'cut off mid-nested-array' => [
+        '{"matrix": [[1, 2], [3, 4', [
+            'matrix' => [
+                [1, 2],
+                [3, 4],
+            ],
+        ]],
+    'cut off with-mixed-complete-and-incomplete' => [
+        '{"complete": "value", "incomplete": "partial', [
+            'complete' => 'value',
+            'incomplete' => 'partial',
+        ]],
+]);
+
 it('handles whitespace normalization', function (): void {
     $input = '{"key"   :   "value"   ,   "key2"   :   "value2"}';
     $result = json_repair($input);

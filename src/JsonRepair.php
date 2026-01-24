@@ -77,6 +77,14 @@ class JsonRepair
             // Handle escape sequences in strings
             // @phpstan-ignore identical.alwaysFalse (state changes in loop iterations)
             if ($this->state === self::STATE_IN_STRING_ESCAPE) {
+                // If we're at the end of the string and in escape state, the escape is incomplete
+                if ($i >= strlen($json)) {
+                    // Remove the backslash, treat as literal character
+                    $this->output = substr($this->output, 0, -1);
+                    $this->state = self::STATE_IN_STRING;
+                    break;
+                }
+
                 $this->handleEscapeSequence($char);
                 $this->state = self::STATE_IN_STRING;
                 $i++;
@@ -132,6 +140,33 @@ class JsonRepair
         // @phpstan-ignore if.alwaysFalse (can be true if string wasn't closed in loop)
         if ($this->inString) {
             $this->output .= '"';
+
+            // If we were in a string escape state, the escape was incomplete
+            // @phpstan-ignore identical.alwaysFalse (state can be STATE_IN_STRING_ESCAPE if string ended during escape)
+            if ($this->state === self::STATE_IN_STRING_ESCAPE) {
+                // Remove the incomplete escape backslash
+                $this->output = substr($this->output, 0, -2) . substr($this->output, -1);
+            }
+
+            // Update state after closing string
+            $this->state = $this->getNextStateAfterString();
+            $this->inString = false;
+        }
+
+        // Handle incomplete key (key without colon/value)
+        // Check if we're expecting a colon (just finished a key) but don't have one
+        // @phpstan-ignore identical.alwaysFalse (state set to STATE_EXPECTING_COLON after closing string key)
+        if ($this->state === self::STATE_EXPECTING_COLON) {
+            // We have a key but no colon/value - add colon and empty value
+            $this->output .= ':""';
+            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            // @phpstan-ignore identical.alwaysFalse (state can be STATE_IN_OBJECT_KEY for unquoted keys)
+        } elseif ($this->state === self::STATE_IN_OBJECT_KEY) {
+            // We're still in key state - might have an incomplete unquoted key
+            // If output ends with a quote, we have a complete key, add colon and empty value
+            if (str_ends_with($this->output, '"') && ! str_ends_with($this->output, ':"')) {
+                $this->output .= ':""';
+            }
         }
 
         // If we're in OBJECT_VALUE state and output ends with ':', add empty string
@@ -142,11 +177,12 @@ class JsonRepair
         }
 
         // Close any unclosed brackets/braces
-        // @phpstan-ignore notIdentical.alwaysFalse (stack populated during loop execution)
         while ($this->stack !== []) {
             $expected = array_pop($this->stack);
 
-            // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (expected can be '}' from stack)
+            // Remove trailing comma before closing
+            $this->removeTrailingComma();
+
             if ($expected === '}' && str_ends_with($this->output, ':')) {
                 $this->output .= '""';
             }
@@ -157,7 +193,6 @@ class JsonRepair
         if (! $this->ensureAscii) {
             $decoded = json_decode($this->output, true);
 
-            // @phpstan-ignore notIdentical.alwaysFalse (output can be valid JSON after repair)
             if ($decoded !== null) {
                 $encoded = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -566,6 +601,7 @@ class JsonRepair
 
         // Handle exponent
         if ($i < $length && ($json[$i] === 'e' || $json[$i] === 'E')) {
+            $exponentStart = $i;
             $this->output .= $json[$i];
             $i++;
 
@@ -574,9 +610,18 @@ class JsonRepair
                 $i++;
             }
 
+            $hasExponentDigits = false;
             while ($i < $length && ctype_digit($json[$i])) {
                 $this->output .= $json[$i];
                 $i++;
+                $hasExponentDigits = true;
+            }
+
+            // If we started an exponent but don't have digits, remove the incomplete exponent
+            if (! $hasExponentDigits) {
+                // Remove the 'e' or 'E' and optional sign
+                $exponentLength = $i - $exponentStart;
+                $this->output = substr($this->output, 0, -$exponentLength);
             }
         }
 
@@ -607,9 +652,12 @@ class JsonRepair
             if (ctype_xdigit($hex)) {
                 $this->output .= '\\u' . $hex;
             } else {
+                // Invalid unicode escape - output as literal backslash + u
                 $this->output .= '\\' . $char;
             }
         } else {
+            // Unknown escape sequence or incomplete - output as literal backslash + char
+            // This handles incomplete escapes (e.g., string ends with \)
             $this->output .= '\\' . $char;
         }
     }

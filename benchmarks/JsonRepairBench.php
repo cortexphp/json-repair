@@ -74,6 +74,14 @@ class JsonRepairBench
     }
 
     /**
+     * @ParamProviders({"provideStreamingJson"})
+     */
+    public function benchRepairStreamingJson(array $params): void
+    {
+        json_repair($params['json']);
+    }
+
+    /**
      * @return array<string, array<string, string>>
      */
     public function provideSimpleJson(): array
@@ -134,6 +142,45 @@ class JsonRepairBench
 
         return [
             'large_array' => ['json' => $brokenJson],
+        ];
+    }
+
+    /**
+     * @return array<string, array<string, string>>
+     */
+    public function provideStreamingJson(): array
+    {
+        return [
+            'cut_off_mid_string' => [
+                'json' => '{"name": "John", "description": "A person who',
+            ],
+            'cut_off_mid_number' => [
+                'json' => '{"count": 123',
+            ],
+            'cut_off_after_colon' => [
+                'json' => '{"name": "John", "age": ',
+            ],
+            'cut_off_mid_key' => [
+                'json' => '{"name": "John", "user',
+            ],
+            'cut_off_mid_object' => [
+                'json' => '{"user": {"name": "John", "age": 30',
+            ],
+            'cut_off_mid_array' => [
+                'json' => '{"items": [1, 2, 3',
+            ],
+            'cut_off_after_comma' => [
+                'json' => '{"name": "John", "age": 30, ',
+            ],
+            'cut_off_mid_escape' => [
+                'json' => '{"message": "Hello\\',
+            ],
+            'cut_off_mid_scientific' => [
+                'json' => '{"value": 1.23e',
+            ],
+            'multiple_incomplete' => [
+                'json' => '{"name": "John", "age": 30, "bio": "A developer who loves',
+            ],
         ];
     }
 }
