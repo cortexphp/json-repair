@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Cortex\JsonRepair\Tests\Unit;
 
 use Cortex\JsonRepair\JsonRepair;
+
 use function Cortex\JsonRepair\json_repair;
 
 it('passes through valid JSON unchanged', function (string $json): void {
@@ -30,8 +31,15 @@ it('repairs single quotes to double quotes', function (string $input, array $exp
         expect($decoded[$key])->toBe($value);
     }
 })->with([
-    'single key-value' => ["{'key': 'value'}", ['key' => 'value']],
-    'multiple key-values' => ["{'name': 'John', 'age': 30}", ['name' => 'John', 'age' => 30]],
+    'single key-value' => [
+        "{'key': 'value'}", [
+            'key' => 'value',
+        ]],
+    'multiple key-values' => [
+        "{'name': 'John', 'age': 30}", [
+            'name' => 'John',
+            'age' => 30,
+        ]],
 ]);
 
 it('repairs unquoted keys', function (string $input, array $expected): void {
@@ -42,8 +50,15 @@ it('repairs unquoted keys', function (string $input, array $expected): void {
         expect($decoded[$key])->toBe($value);
     }
 })->with([
-    'single unquoted key' => ['{key: "value"}', ['key' => 'value']],
-    'multiple unquoted keys' => ['{name: "John", age: 30}', ['name' => 'John', 'age' => 30]],
+    'single unquoted key' => [
+        '{key: "value"}', [
+            'key' => 'value',
+        ]],
+    'multiple unquoted keys' => [
+        '{name: "John", age: 30}', [
+            'name' => 'John',
+            'age' => 30,
+        ]],
 ]);
 
 it('repairs missing quotes around keys', function (): void {
@@ -58,8 +73,15 @@ it('repairs trailing commas', function (string $input, array $expected): void {
     $decoded = json_decode($result, true);
     expect($decoded)->toBe($expected);
 })->with([
-    'object with trailing comma' => ['{"key": "value",}', ['key' => 'value']],
-    'object with multiple keys and trailing comma' => ['{"key1": "v1", "key2": "v2",}', ['key1' => 'v1', 'key2' => 'v2']],
+    'object with trailing comma' => [
+        '{"key": "value",}', [
+            'key' => 'value',
+        ]],
+    'object with multiple keys and trailing comma' => [
+        '{"key1": "v1", "key2": "v2",}', [
+            'key1' => 'v1',
+            'key2' => 'v2',
+        ]],
     'array with trailing comma' => ['[1, 2, 3,]', [1, 2, 3]],
 ]);
 
@@ -69,7 +91,11 @@ it('repairs missing commas', function (string $input, array $expected): void {
     $decoded = json_decode($result, true);
     expect($decoded)->toBe($expected);
 })->with([
-    'object missing comma' => ['{"key1": "v1" "key2": "v2"}', ['key1' => 'v1', 'key2' => 'v2']],
+    'object missing comma' => [
+        '{"key1": "v1" "key2": "v2"}', [
+            'key1' => 'v1',
+            'key2' => 'v2',
+        ]],
     'array missing commas' => ['["a" "b" "c"]', ['a', 'b', 'c']],
 ]);
 
@@ -85,7 +111,10 @@ it('repairs missing closing brackets', function (string $input, array $expected)
     $decoded = json_decode($result, true);
     expect($decoded)->toBe($expected);
 })->with([
-    'object missing closing brace' => ['{"key": "value"', ['key' => 'value']],
+    'object missing closing brace' => [
+        '{"key": "value"', [
+            'key' => 'value',
+        ]],
     'array missing closing bracket' => ['["a", "b"', ['a', 'b']],
 ]);
 
@@ -98,6 +127,7 @@ it('repairs missing closing braces', function (string $input, string $expectedPa
     foreach ($keys as $key) {
         $value = $value[$key];
     }
+
     expect($value)->toBe($expectedValue);
 })->with([
     'simple object' => ['{"key": "value"', 'key', 'value'],
@@ -110,27 +140,35 @@ it('repairs missing values', function (string $input, array $expected): void {
     $decoded = json_decode($result, true);
     expect($decoded)->toBe($expected);
 })->with([
-    'single missing value' => ['{"key": }', ['key' => '']],
-    'multiple keys with missing value' => ['{"key1": "v1", "key2": }', ['key1' => 'v1', 'key2' => '']],
+    'single missing value' => [
+        '{"key": }', [
+            'key' => '',
+        ]],
+    'multiple keys with missing value' => [
+        '{"key1": "v1", "key2": }', [
+            'key1' => 'v1',
+            'key2' => '',
+        ]],
 ]);
 
-it('repairs Python-style booleans and null', function (string $input, mixed $expected): void {
+it('repairs non-standard booleans and null', function (string $input, mixed $expected): void {
     $result = json_repair($input);
     expect(json_validate($result))->toBeTrue();
     $decoded = json_decode($result, true);
+
     if (is_array($expected)) {
         expect($decoded)->toBe($expected);
     } else {
         expect($decoded['key'])->toBe($expected);
     }
 })->with([
-    'Python True' => ['{"key": True}', true],
-    'Python False' => ['{"key": False}', false],
-    'Python None' => ['{"key": None}', null],
+    'capitalized True' => ['{"key": True}', true],
+    'capitalized False' => ['{"key": False}', false],
+    'capitalized None' => ['{"key": None}', null],
     'JSON true' => ['{"key": true}', true],
     'JSON false' => ['{"key": false}', false],
     'JSON null' => ['{"key": null}', null],
-    'array with Python booleans' => ['[True, False, None]', [true, false, null]],
+    'array with capitalized booleans' => ['[True, False, None]', [true, false, null]],
 ]);
 
 it('handles nested structures', function (string $input): void {
@@ -154,6 +192,7 @@ it('handles empty structures', function (string $input): void {
 it('handles numbers correctly', function (string $input, int|float|string $expected): void {
     $result = json_repair($input);
     expect(json_validate($result))->toBeTrue();
+
     if (is_string($expected)) {
         // For large numbers, just validate they're valid JSON
         expect(json_validate($result))->toBeTrue();
@@ -171,8 +210,10 @@ it('handles numbers correctly', function (string $input, int|float|string $expec
 it('handles multiple JSON objects', function (string $input, ?string $expectedKey, ?string $expectedValue): void {
     $result = json_repair($input);
     expect(json_validate($result))->toBeTrue();
+
     if ($expectedKey !== null) {
         $decoded = json_decode($result, true);
+
         if ($expectedValue !== null) {
             expect($decoded[$expectedKey])->toBe($expectedValue);
         } else {
@@ -185,13 +226,17 @@ it('handles multiple JSON objects', function (string $input, ?string $expectedKe
     'object then array' => ['{"key":"value"}[1,2,3,True]', null, null],
 ]);
 
-it('extracts JSON from markdown code blocks', function (string $input, ?string $expectedKey, ?string $expectedValue): void {
-    $result = json_repair($input);
-    expect(json_validate($result))->toBeTrue();
-    if ($expectedKey !== null) {
-        expect(json_decode($result, true)[$expectedKey])->toBe($expectedValue);
-    }
-})->with([
+it(
+    'extracts JSON from markdown code blocks',
+    function (string $input, ?string $expectedKey, ?string $expectedValue): void {
+        $result = json_repair($input);
+        expect(json_validate($result))->toBeTrue();
+
+        if ($expectedKey !== null) {
+            expect(json_decode($result, true)[$expectedKey])->toBe($expectedValue);
+        }
+    },
+)->with([
     'single code block' => ['lorem ```json {"key":"value"} ``` ipsum', 'key', 'value'],
     'multiple code blocks' => ['```json {"key":"value"} ``` ```json [1,2,3,True] ```', null, null],
 ]);
@@ -257,7 +302,7 @@ it('handles arrays with mixed types', function (string $input, array $expected):
     expect(json_decode($result, true))->toBe($expected);
 })->with([
     'JSON booleans and null' => ['[1, "two", true, false, null]', [1, 'two', true, false, null]],
-    'Python booleans and null' => ['[True, False, None, "string", 123]', [true, false, null, 'string', 123]],
+    'capitalized booleans and null' => ['[True, False, None, "string", 123]', [true, false, null, 'string', 123]],
 ]);
 
 it('handles empty strings as values', function (string $input, array $expected): void {
@@ -266,8 +311,15 @@ it('handles empty strings as values', function (string $input, array $expected):
     $decoded = json_decode($result, true);
     expect($decoded)->toBe($expected);
 })->with([
-    'incomplete empty string' => ['{"key": ""', ['key' => '']],
-    'complete with empty string' => ['{"key1": "", "key2": "value"}', ['key1' => '', 'key2' => 'value']],
+    'incomplete empty string' => [
+        '{"key": ""', [
+            'key' => '',
+        ]],
+    'complete with empty string' => [
+        '{"key1": "", "key2": "value"}', [
+            'key1' => '',
+            'key2' => 'value',
+        ]],
 ]);
 
 it('handles missing keys in objects', function (): void {
@@ -283,8 +335,14 @@ it('handles incomplete JSON at end of string', function (string $input, array $e
     $decoded = json_decode($result, true);
     expect($decoded)->toBe($expected);
 })->with([
-    'incomplete string value' => ['{"key": "val', ['key' => 'val']],
-    'missing value' => ['{"key": ', ['key' => '']],
+    'incomplete string value' => [
+        '{"key": "val', [
+            'key' => 'val',
+        ]],
+    'missing value' => [
+        '{"key": ', [
+            'key' => '',
+        ]],
     'incomplete array' => ['["a", "b', ['a', 'b']],
 ]);
 

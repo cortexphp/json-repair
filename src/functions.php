@@ -9,6 +9,7 @@ namespace Cortex\JsonRepair;
  *
  * @param string $json The JSON string to repair
  * @param bool $ensureAscii Whether to escape non-ASCII characters (default: true)
+ *
  * @return string The repaired JSON string
  */
 function json_repair(string $json, bool $ensureAscii = true): string
