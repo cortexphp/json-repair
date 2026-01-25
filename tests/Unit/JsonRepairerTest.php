@@ -299,7 +299,7 @@ it('handles escape sequences', function (string $input, string $expectedValue): 
     'invalid escape sequence' => ['{"key": "value\\xvalue"}', 'value\\xvalue'],
 ]);
 
-it('works with JsonRepair class directly', function (): void {
+it('works with JsonRepairer class directly', function (): void {
     $repairer = new JsonRepairer("{'key': 'value'}");
     $result = $repairer->repair();
     expect(json_validate($result))->toBeTrue();

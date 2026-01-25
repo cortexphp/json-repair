@@ -17,27 +17,26 @@ composer require cortexphp/json-repair
 ## Quick Start
 
 ```php
-use Cortex\JsonRepair\JsonRepair;
+use Cortex\JsonRepair\JsonRepairer;
 
 use function Cortex\JsonRepair\json_repair;
 use function Cortex\JsonRepair\json_repair_decode;
 
-// Repair broken JSON (single quotes, unquoted keys, trailing comma)
+// Broken JSON (single quotes, unquoted keys, trailing comma)
 $broken = "{'name': 'John', age: 30, active: true,}";
 
-$repaired = (new JsonRepair($broken))->repair();
+$repaired = (new JsonRepairer($broken))->repair();
 // {"name": "John", "age": 30, "active": true}
 
 // Or use the helper function
 $repaired = json_repair($broken);
 
 // Repair and decode in one step
-$data = (new JsonRepair($broken))->decode();
+$data = (new JsonRepairer($broken))->decode();
 // ['name' => 'John', 'age' => 30, 'active' => true]
 
 // Or use the helper function
 $data = json_repair_decode($broken);
-// ['name' => 'John', 'age' => 30, 'active' => true]
 ```
 
 ## Benchmarking
@@ -47,10 +46,6 @@ Run performance benchmarks using PHPBench:
 ```bash
 composer run benchmark
 ```
-
-## Documentation
-
-📚 **[View Full Documentation →](https://docs.cortexphp.com/json-repair)**
 
 ## Credits
 
