@@ -41,9 +41,13 @@ class JsonRepairer
 
     private int $stateBeforeString = self::STATE_START;
 
+    private int $currentKeyStart = -1;
+
     public function __construct(
         protected string $json,
         private readonly bool $ensureAscii = true,
+        private readonly bool $omitEmptyValues = false,
+        private readonly bool $omitIncompleteStrings = false,
     ) {}
 
     public function repair(): string
@@ -66,6 +70,7 @@ class JsonRepairer
         $this->inString = false;
         $this->stringDelimiter = '';
         $this->stateBeforeString = self::STATE_START;
+        $this->currentKeyStart = -1;
 
         $length = strlen($json);
         $i = 0;
@@ -101,6 +106,12 @@ class JsonRepairer
                     $this->inString = false;
                     $this->stringDelimiter = '';
                     $this->state = $this->getNextStateAfterString();
+
+                    // Reset key tracking after successfully completing a string value
+                    if ($this->state === self::STATE_EXPECTING_COMMA_OR_END) {
+                        $this->currentKeyStart = -1;
+                    }
+
                     $i++;
                     continue;
                 }
@@ -139,17 +150,26 @@ class JsonRepairer
         // Close any unclosed strings
         // @phpstan-ignore if.alwaysFalse (can be true if string wasn't closed in loop)
         if ($this->inString) {
-            $this->output .= '"';
+            // Check if we should remove incomplete string values
+            // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (stateBeforeString is set when entering string state and can be STATE_IN_OBJECT_VALUE)
+            if ($this->omitIncompleteStrings && $this->stateBeforeString === self::STATE_IN_OBJECT_VALUE) {
+                $this->removeCurrentKey();
+                // Update state after removing key
+                $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            } else {
+                $this->output .= '"';
 
-            // If we were in a string escape state, the escape was incomplete
-            // @phpstan-ignore identical.alwaysFalse (state can be STATE_IN_STRING_ESCAPE if string ended during escape)
-            if ($this->state === self::STATE_IN_STRING_ESCAPE) {
-                // Remove the incomplete escape backslash
-                $this->output = substr($this->output, 0, -2) . substr($this->output, -1);
+                // If we were in a string escape state, the escape was incomplete
+                // @phpstan-ignore identical.alwaysFalse (state can be STATE_IN_STRING_ESCAPE if string ended during escape)
+                if ($this->state === self::STATE_IN_STRING_ESCAPE) {
+                    // Remove the incomplete escape backslash
+                    $this->output = substr($this->output, 0, -2) . substr($this->output, -1);
+                }
+
+                // Update state after closing string
+                $this->state = $this->getNextStateAfterString();
             }
 
-            // Update state after closing string
-            $this->state = $this->getNextStateAfterString();
             $this->inString = false;
         }
 
@@ -158,21 +178,35 @@ class JsonRepairer
         // @phpstan-ignore identical.alwaysFalse (state set to STATE_EXPECTING_COLON after closing string key)
         if ($this->state === self::STATE_EXPECTING_COLON) {
             // We have a key but no colon/value - add colon and empty value
-            $this->output .= ':""';
+            if ($this->omitEmptyValues) {
+                $this->removeCurrentKey();
+            } else {
+                $this->output .= ':""';
+            }
+
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
             // @phpstan-ignore identical.alwaysFalse (state can be STATE_IN_OBJECT_KEY for unquoted keys)
         } elseif ($this->state === self::STATE_IN_OBJECT_KEY) {
             // We're still in key state - might have an incomplete unquoted key
             // If output ends with a quote, we have a complete key, add colon and empty value
             if (str_ends_with($this->output, '"') && ! str_ends_with($this->output, ':"')) {
-                $this->output .= ':""';
+                if ($this->omitEmptyValues) {
+                    $this->removeCurrentKey();
+                } else {
+                    $this->output .= ':""';
+                }
             }
         }
 
         // If we're in OBJECT_VALUE state and output ends with ':', add empty string
         // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (state can change during loop)
         if ($this->state === self::STATE_IN_OBJECT_VALUE && str_ends_with($this->output, ':')) {
-            $this->output .= '""';
+            if ($this->omitEmptyValues) {
+                $this->removeCurrentKey();
+            } else {
+                $this->output .= '""';
+            }
+
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
         }
 
@@ -184,7 +218,11 @@ class JsonRepairer
             $this->removeTrailingComma();
 
             if ($expected === '}' && str_ends_with($this->output, ':')) {
-                $this->output .= '""';
+                if ($this->omitEmptyValues) {
+                    $this->removeCurrentKey();
+                } else {
+                    $this->output .= '""';
+                }
             }
 
             $this->output .= $expected;
@@ -363,6 +401,8 @@ class JsonRepairer
         }
 
         if ($char === '"' || $char === "'") {
+            // Track where the key starts
+            $this->currentKeyStart = strlen($this->output);
             $this->output .= '"';
             $this->inString = true;
             $this->stringDelimiter = $char;
@@ -374,6 +414,8 @@ class JsonRepairer
 
         // Unquoted key
         if (ctype_alnum($char) || $char === '_' || $char === '-') {
+            // Track where the key starts
+            $this->currentKeyStart = strlen($this->output);
             $this->output .= '"';
             while ($i < strlen($json) && (ctype_alnum($json[$i]) || $json[$i] === '_' || $json[$i] === '-')) {
                 $this->output .= $json[$i];
@@ -419,6 +461,8 @@ class JsonRepairer
             $this->output .= '{';
             $this->stack[] = '}';
             $this->state = self::STATE_IN_OBJECT_KEY;
+            // Reset key tracking when starting a nested object (this is a value, not a key)
+            $this->currentKeyStart = -1;
 
             return $i + 1;
         }
@@ -427,6 +471,8 @@ class JsonRepairer
             $this->output .= '[';
             $this->stack[] = ']';
             $this->state = self::STATE_IN_ARRAY;
+            // Reset key tracking when starting a nested array (this is a value, not a key)
+            $this->currentKeyStart = -1;
 
             return $i + 1;
         }
@@ -443,7 +489,11 @@ class JsonRepairer
 
         if ($char === '}') {
             if (str_ends_with($this->output, ':')) {
-                $this->output .= '""';
+                if ($this->omitEmptyValues) {
+                    $this->removeCurrentKey();
+                } else {
+                    $this->output .= '""';
+                }
             }
 
             $this->removeTrailingComma();
@@ -460,6 +510,8 @@ class JsonRepairer
         if ($matchResult === 1) {
             $this->output .= $this->normalizeBoolean($matches[1]);
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            // Reset key tracking after successfully completing a boolean/null value
+            $this->currentKeyStart = -1;
 
             return $i + strlen($matches[1]);
         }
@@ -473,7 +525,12 @@ class JsonRepairer
 
         // Missing value
         if ($char === ',' || $char === '}') {
-            $this->output .= '""';
+            if ($this->omitEmptyValues) {
+                $this->removeCurrentKey();
+            } else {
+                $this->output .= '""';
+            }
+
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
 
             return $i;
@@ -626,6 +683,8 @@ class JsonRepairer
         }
 
         $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+        // Reset key tracking after successfully completing a number value
+        $this->currentKeyStart = -1;
 
         return $i;
     }
@@ -683,5 +742,22 @@ class JsonRepairer
             'false' => 'false',
             default => 'null',
         };
+    }
+
+    private function removeCurrentKey(): void
+    {
+        if ($this->currentKeyStart >= 0) {
+            $beforeKey = substr($this->output, 0, $this->currentKeyStart);
+            // Remove preceding comma and whitespace if present
+            $beforeKey = rtrim($beforeKey);
+
+            if (str_ends_with($beforeKey, ',')) {
+                $beforeKey = substr($beforeKey, 0, -1);
+                $beforeKey = rtrim($beforeKey);
+            }
+
+            $this->output = $beforeKey;
+            $this->currentKeyStart = -1;
+        }
     }
 }

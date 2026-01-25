@@ -552,3 +552,191 @@ it('handles whitespace normalization', function (): void {
         'key2' => 'value2',
     ]);
 });
+
+it('omits empty values when omitEmptyValues is true', function (string $input, array $expected): void {
+    $result = json_repair($input, omitEmptyValues: true);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe($expected);
+})->with([
+    'missing value after colon' => [
+        '{"key": }', [],
+    ],
+    'missing value with other keys' => [
+        '{"key1": "v1", "key2": }', [
+            'key1' => 'v1',
+        ],
+    ],
+    'missing value at end' => [
+        '{"name": "John", "age": ', [
+            'name' => 'John',
+        ],
+    ],
+    'key without colon' => [
+        '{"key"', [],
+    ],
+    'multiple missing values' => [
+        '{"key1": "v1", "key2": , "key3": "v3", "key4": }', [
+            'key1' => 'v1',
+            'key3' => 'v3',
+        ],
+    ],
+    'nested object with missing value' => [
+        '{"user": {"name": "John", "age": }}', [
+            'user' => [
+                'name' => 'John',
+            ],
+        ],
+    ],
+    'all values missing' => [
+        '{"key1": , "key2": }', [],
+    ],
+]);
+
+it('keeps empty values when omitEmptyValues is false', function (string $input, array $expected): void {
+    $result = json_repair($input, omitEmptyValues: false);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe($expected);
+})->with([
+    'missing value after colon' => [
+        '{"key": }', [
+            'key' => '',
+        ],
+    ],
+    'missing value with other keys' => [
+        '{"key1": "v1", "key2": }', [
+            'key1' => 'v1',
+            'key2' => '',
+        ],
+    ],
+]);
+
+it('omits incomplete strings when omitIncompleteStrings is true', function (string $input, array $expected): void {
+    $result = json_repair($input, omitIncompleteStrings: true);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe($expected);
+})->with([
+    'cut off mid-string value' => [
+        '{"name": "John", "description": "A person who', [
+            'name' => 'John',
+        ],
+    ],
+    'incomplete string at end' => [
+        '{"key": "val', [],
+    ],
+    'multiple incomplete strings' => [
+        '{"name": "John", "bio": "A developer who', [
+            'name' => 'John',
+        ],
+    ],
+    'complete and incomplete strings' => [
+        '{"complete": "value", "incomplete": "partial', [
+            'complete' => 'value',
+        ],
+    ],
+    'nested object with incomplete string' => [
+        '{"user": {"name": "John", "bio": "A person', [
+            'user' => [
+                'name' => 'John',
+            ],
+        ],
+    ],
+    'all strings incomplete' => [
+        '{"key1": "val1', [],
+    ],
+]);
+
+it('keeps incomplete strings when omitIncompleteStrings is false', function (string $input, array $expected): void {
+    $result = json_repair($input, omitIncompleteStrings: false);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe($expected);
+})->with([
+    'cut off mid-string value' => [
+        '{"name": "John", "description": "A person who', [
+            'name' => 'John',
+            'description' => 'A person who',
+        ],
+    ],
+    'incomplete string at end' => [
+        '{"key": "val', [
+            'key' => 'val',
+        ],
+    ],
+]);
+
+it('handles both omitEmptyValues and omitIncompleteStrings together', function (string $input, array $expected): void {
+    $result = json_repair($input, omitEmptyValues: true, omitIncompleteStrings: true);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe($expected);
+})->with([
+    'missing value and incomplete string' => [
+        '{"name": "John", "age": , "bio": "A developer who', [
+            'name' => 'John',
+        ],
+    ],
+    'multiple issues' => [
+        '{"key1": "v1", "key2": , "key3": "partial', [
+            'key1' => 'v1',
+        ],
+    ],
+    'all values problematic' => [
+        '{"key1": , "key2": "incomplete', [],
+    ],
+]);
+
+it('works with JsonRepairer class directly with omitEmptyValues', function (): void {
+    $repairer = new JsonRepairer('{"key": }', omitEmptyValues: true);
+    $result = $repairer->repair();
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe([]);
+});
+
+it('works with JsonRepairer class directly with omitIncompleteStrings', function (): void {
+    $repairer = new JsonRepairer('{"key": "val', omitIncompleteStrings: true);
+    $result = $repairer->repair();
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe([]);
+});
+
+it('works with json_repair_decode with new options', function (): void {
+    $decoded = json_repair_decode('{"key": }', omitEmptyValues: true);
+    expect($decoded)->toBeArray();
+    expect($decoded)->toBe([]);
+});
+
+it('handles nested structures with omitEmptyValues', function (): void {
+    $input = '{"user": {"name": "John", "age": }, "meta": {"count": }}';
+    $result = json_repair($input, omitEmptyValues: true);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe([
+        'user' => [
+            'name' => 'John',
+        ],
+        'meta' => [],
+    ]);
+});
+
+it('handles edge case where removing key leaves empty object', function (): void {
+    $input = '{"key": }';
+    $result = json_repair($input, omitEmptyValues: true);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe([]);
+    expect($result)->toBe('{}');
+});
+
+it('handles edge case where removing incomplete string leaves empty object', function (): void {
+    $input = '{"key": "val';
+    $result = json_repair($input, omitIncompleteStrings: true);
+    expect(json_validate($result))->toBeTrue();
+    $decoded = json_decode($result, true);
+    expect($decoded)->toBe([]);
+    expect($result)->toBe('{}');
+});
