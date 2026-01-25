@@ -1,4 +1,6 @@
-# Repair broken JSON strings
+# Repair broken or incomplete JSON strings
+
+Repair invalid JSON strings by automatically fixing common syntax errors like single quotes, unquoted keys, trailing commas, and missing brackets.
 
 [![Latest Version](https://img.shields.io/packagist/v/cortexphp/json-repair.svg?style=flat-square&logo=composer)](https://packagist.org/packages/cortexphp/json-repair)
 ![GitHub Actions Test Workflow Status](https://img.shields.io/github/actions/workflow/status/cortexphp/json-repair/run-tests.yml?style=flat-square&logo=github)
@@ -103,14 +105,6 @@ $data = json_repair_decode(
     omitEmptyValues: true,
     omitIncompleteStrings: true
 );
-```
-
-## Benchmarking
-
-Run performance benchmarks using PHPBench:
-
-```bash
-composer run benchmark
 ```
 
 ## Credits
