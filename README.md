@@ -24,6 +24,7 @@ use function Cortex\JsonRepair\json_repair_decode;
 
 // Repair broken JSON (single quotes, unquoted keys, trailing comma)
 $broken = "{'name': 'John', age: 30, active: true,}";
+
 $repaired = (new JsonRepair($broken))->repair();
 // {"name": "John", "age": 30, "active": true}
 

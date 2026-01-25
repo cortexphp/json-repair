@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Cortex\JsonRepair;
 
-class JsonRepair
+class JsonRepairer
 {
     private const int STATE_START = 0;
 

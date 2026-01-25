@@ -3,7 +3,8 @@
     "description": "Repair invalid JSON strings by fixing common syntax errors like single quotes, unquoted keys, trailing commas, and missing brackets. Perfect for parsing LLM outputs and malformed API responses.",
     "keywords": [
         "json",
-        "json-repair"
+        "json-repair",
+        "json-fixer"
     ],
     "homepage": "https://github.com/cortexphp/json-repair",
     "type": "library",
@@ -16,7 +17,8 @@
         }
     ],
     "require": {
-        "php": "^8.3"
+        "php": "^8.3",
+        "ext-json": "*"
     },
     "require-dev": {
         "pestphp/pest": "^4.1.4",

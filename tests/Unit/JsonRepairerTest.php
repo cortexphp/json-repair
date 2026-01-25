@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Cortex\JsonRepair\Tests\Unit;
 
-use Cortex\JsonRepair\JsonRepair;
+use Cortex\JsonRepair\JsonRepairer;
 
 use function Cortex\JsonRepair\json_repair;
 use function Cortex\JsonRepair\json_repair_decode;
 
-covers(JsonRepair::class);
+covers(JsonRepairer::class);
 
 it('passes through valid JSON unchanged', function (string $json): void {
     $result = json_repair($json);
@@ -300,14 +300,14 @@ it('handles escape sequences', function (string $input, string $expectedValue): 
 ]);
 
 it('works with JsonRepair class directly', function (): void {
-    $repairer = new JsonRepair("{'key': 'value'}");
+    $repairer = new JsonRepairer("{'key': 'value'}");
     $result = $repairer->repair();
     expect(json_validate($result))->toBeTrue();
     expect(json_decode($result, true)['key'])->toBe('value');
 });
 
 it('can decode repaired JSON', function (): void {
-    $repairer = new JsonRepair("{'key': 'value', 'number': 123}");
+    $repairer = new JsonRepairer("{'key': 'value', 'number': 123}");
     $decoded = $repairer->decode();
 
     expect($decoded)->toBeArray();

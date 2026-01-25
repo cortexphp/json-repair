@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Cortex\JsonRepair\Benchmarks;
 
-use Cortex\JsonRepair\JsonRepair;
+use Cortex\JsonRepair\JsonRepairer;
 
 use function Cortex\JsonRepair\json_repair;
 use function Cortex\JsonRepair\json_repair_decode;
@@ -14,7 +14,7 @@ use function Cortex\JsonRepair\json_repair_decode;
  * @Iterations(20)
  * @Warmup(2)
  */
-class JsonRepairBench
+class JsonRepairerBench
 {
     /**
      * @ParamProviders({"provideSimpleJson"})
@@ -69,7 +69,7 @@ class JsonRepairBench
      */
     public function benchRepairWithClass(array $params): void
     {
-        $repairer = new JsonRepair($params['json']);
+        $repairer = new JsonRepairer($params['json']);
         $repairer->repair();
     }
 

@@ -14,7 +14,7 @@ namespace Cortex\JsonRepair;
  */
 function json_repair(string $json, bool $ensureAscii = true): string
 {
-    $repairer = new JsonRepair($json, $ensureAscii);
+    $repairer = new JsonRepairer($json, $ensureAscii);
 
     return $repairer->repair();
 }
@@ -35,7 +35,7 @@ function json_repair_decode(
     int $flags = JSON_THROW_ON_ERROR,
     bool $ensureAscii = true,
 ): array|object {
-    $repairer = new JsonRepair($json, $ensureAscii);
+    $repairer = new JsonRepairer($json, $ensureAscii);
 
     return $repairer->decode($depth, $flags);
 }
