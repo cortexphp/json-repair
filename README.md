@@ -107,6 +107,28 @@ $data = json_repair_decode(
 );
 ```
 
+## Logging
+
+The library supports PSR-3 logging for debugging repair operations. Pass any PSR-3 compatible logger to see what repairs are being made:
+
+```php
+use Psr\Log\LoggerInterface;
+
+// Using the helper function
+$repaired = json_repair($broken, logger: $logger);
+
+// Using the class (implements LoggerAwareInterface)
+$repairer = new JsonRepairer($broken);
+$repairer->setLogger($logger);
+$repaired = $repairer->repair();
+```
+
+Log messages include the position in the JSON string and a context snippet showing where the repair occurred. This is useful for:
+
+- Debugging why certain repairs are being made
+- Understanding how malformed JSON is being interpreted
+- Tracking repair operations in production environments
+
 ## Credits
 
 - [Sean Tymon](https://github.com/tymondesigns)

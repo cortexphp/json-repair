@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cortex\JsonRepair;
 
+use Psr\Log\LoggerInterface;
+
 /**
  * Repair a broken JSON string.
  *
@@ -11,6 +13,7 @@ namespace Cortex\JsonRepair;
  * @param bool $ensureAscii Whether to escape non-ASCII characters (default: true)
  * @param bool $omitEmptyValues Whether to remove keys with missing values instead of adding empty strings (default: false)
  * @param bool $omitIncompleteStrings Whether to remove keys with incomplete string values instead of closing them (default: false)
+ * @param \Psr\Log\LoggerInterface|null $logger Optional PSR-3 logger for debugging repair actions
  *
  * @return string The repaired JSON string
  */
@@ -19,8 +22,13 @@ function json_repair(
     bool $ensureAscii = true,
     bool $omitEmptyValues = false,
     bool $omitIncompleteStrings = false,
+    ?LoggerInterface $logger = null,
 ): string {
     $repairer = new JsonRepairer($json, $ensureAscii, $omitEmptyValues, $omitIncompleteStrings);
+
+    if ($logger instanceof LoggerInterface) {
+        $repairer->setLogger($logger);
+    }
 
     return $repairer->repair();
 }
@@ -34,6 +42,7 @@ function json_repair(
  * @param bool $ensureAscii Whether to escape non-ASCII characters (default: true)
  * @param bool $omitEmptyValues Whether to remove keys with missing values instead of adding empty strings (default: false)
  * @param bool $omitIncompleteStrings Whether to remove keys with incomplete string values instead of closing them (default: false)
+ * @param \Psr\Log\LoggerInterface|null $logger Optional PSR-3 logger for debugging repair actions
  *
  * @return array<mixed>|object The decoded JSON data
  */
@@ -44,8 +53,13 @@ function json_repair_decode(
     bool $ensureAscii = true,
     bool $omitEmptyValues = false,
     bool $omitIncompleteStrings = false,
+    ?LoggerInterface $logger = null,
 ): array|object {
     $repairer = new JsonRepairer($json, $ensureAscii, $omitEmptyValues, $omitIncompleteStrings);
+
+    if ($logger instanceof LoggerInterface) {
+        $repairer->setLogger($logger);
+    }
 
     return $repairer->decode($depth, $flags);
 }

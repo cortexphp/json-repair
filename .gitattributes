@@ -11,3 +11,4 @@
 /ecs.php export-ignore
 /rector.php export-ignore
 /tests export-ignore
+/benchmarks export-ignore
