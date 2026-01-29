@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Cortex\JsonRepair;
 
+use Psr\Log\LoggerAwareTrait;
+use Psr\Log\LoggerAwareInterface;
 use Cortex\JsonRepair\Exceptions\JsonRepairException;
 
-class JsonRepairer
+class JsonRepairer implements LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+
     private const int STATE_START = 0;
 
     private const int STATE_IN_STRING = 1;
@@ -78,11 +82,19 @@ class JsonRepairer
     public function repair(): string
     {
         if (json_validate($this->json)) {
+            $this->log('JSON is already valid, returning as-is');
+
             return $this->json;
         }
 
+        $this->log('Starting JSON repair');
+
         // Extract JSON from markdown code blocks if present
         $json = $this->extractJsonFromMarkdown($this->json);
+
+        if ($json !== $this->json) {
+            $this->log('Extracted JSON from markdown code block');
+        }
 
         // Handle multiple JSON objects
         $json = $this->extractFirstValidJson($json);
@@ -108,16 +120,15 @@ class JsonRepairer
             // @phpstan-ignore identical.alwaysFalse (state changes in loop iterations)
             if ($this->state === self::STATE_IN_STRING_ESCAPE) {
                 // If we're at the end of the string and in escape state, the escape is incomplete
+                // Just drop the incomplete escape (backslash wasn't added to output yet)
                 if ($i >= strlen($json)) {
-                    // Remove the backslash, treat as literal character
-                    $this->output = substr($this->output, 0, -1);
                     $this->state = self::STATE_IN_STRING;
                     break;
                 }
 
-                $this->handleEscapeSequence($char);
+                $extraCharsConsumed = $this->handleEscapeSequence($char, $json);
                 $this->state = self::STATE_IN_STRING;
-                $i++;
+                $i += 1 + $extraCharsConsumed;
                 continue;
             }
 
@@ -126,6 +137,15 @@ class JsonRepairer
             if ($this->state === self::STATE_IN_STRING) {
                 // Check for smart quotes as closing delimiter
                 $smartQuoteLength = $this->getSmartQuoteLength($json, $i);
+
+                // Handle double quote inside single-quoted string - must escape it
+                // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (delimiter set when entering string state and can be single quote)
+                if ($char === '"' && $this->stringDelimiter === "'") {
+                    $this->log('Escaping double quote inside single-quoted string');
+                    $this->output .= '\\"';
+                    $i++;
+                    continue;
+                }
 
                 // @phpstan-ignore identical.alwaysFalse (delimiter set when entering string state)
                 if ($char === $this->stringDelimiter || $smartQuoteLength > 0) {
@@ -138,6 +158,7 @@ class JsonRepairer
 
                     // @phpstan-ignore booleanAnd.leftAlwaysFalse, booleanAnd.rightAlwaysFalse, booleanAnd.alwaysFalse (variables can be true at runtime)
                     if ($isRegularQuote && $isInValue && $this->shouldEscapeQuoteInValue($json, $i)) {
+                        $this->log('Escaping embedded quote inside string value');
                         $this->output .= '\\"';
                         $i++;
                         continue;
@@ -160,7 +181,7 @@ class JsonRepairer
                 }
 
                 if ($char === '\\') {
-                    $this->output .= $char;
+                    // Don't output the backslash yet - let handleEscapeSequence decide
                     $this->state = self::STATE_IN_STRING_ESCAPE;
                     $i++;
                     continue;
@@ -169,6 +190,9 @@ class JsonRepairer
                 // Check if this is a structural character that should close an unclosed string
                 // This handles cases like {"key": "value with no closing quote}
                 if (($char === '}' || $char === ']') && $this->shouldCloseStringAtStructuralChar($json, $i)) {
+                    $this->log('Closing unclosed string at structural character', [
+                        'char' => $char,
+                    ]);
                     // Close the string and let the structural character be processed
                     $this->output .= '"';
                     $this->inString = false;
@@ -214,18 +238,16 @@ class JsonRepairer
             // Check if we should remove incomplete string values
             // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (stateBeforeString is set when entering string state and can be STATE_IN_OBJECT_VALUE)
             if ($this->omitIncompleteStrings && $this->stateBeforeString === self::STATE_IN_OBJECT_VALUE) {
+                $this->log('Removing incomplete string value (omitIncompleteStrings enabled)');
                 $this->removeCurrentKey();
                 // Update state after removing key
                 $this->state = self::STATE_EXPECTING_COMMA_OR_END;
             } else {
+                $this->log('Adding missing closing quote for unclosed string');
                 $this->output .= '"';
 
-                // If we were in a string escape state, the escape was incomplete
-                // @phpstan-ignore identical.alwaysFalse (state can be STATE_IN_STRING_ESCAPE if string ended during escape)
-                if ($this->state === self::STATE_IN_STRING_ESCAPE) {
-                    // Remove the incomplete escape backslash
-                    $this->output = substr($this->output, 0, -2) . substr($this->output, -1);
-                }
+                // Note: If we were in escape state, the incomplete escape backslash
+                // was never added to output (we defer adding it to handleEscapeSequence)
 
                 // Update state after closing string
                 $this->state = $this->getNextStateAfterString();
@@ -240,8 +262,10 @@ class JsonRepairer
         if ($this->state === self::STATE_EXPECTING_COLON) {
             // We have a key but no colon/value - add colon and empty value
             if ($this->omitEmptyValues) {
+                $this->log('Removing key without value (omitEmptyValues enabled)');
                 $this->removeCurrentKey();
             } else {
+                $this->log('Adding missing colon and empty value for incomplete key');
                 $this->output .= ':""';
             }
 
@@ -278,6 +302,9 @@ class JsonRepairer
         // Close any unclosed brackets/braces
         while ($this->stack !== []) {
             $expected = array_pop($this->stack);
+            $this->log('Adding missing closing bracket/brace', [
+                'char' => $expected,
+            ]);
 
             // Remove trailing comma before closing
             $this->removeTrailingComma();
@@ -523,6 +550,7 @@ class JsonRepairer
                 $afterDoubleQuote = $json[$i + 2];
 
                 if (ctype_alnum($afterDoubleQuote) || $afterDoubleQuote === '_' || $afterDoubleQuote === ' ') {
+                    $this->log('Found doubled quote delimiter pattern, normalizing key');
                     // This looks like ""key"" pattern - skip the opening "" and read the key
                     $this->currentKeyStart = strlen($this->output);
                     $this->output .= '"';
@@ -575,6 +603,10 @@ class JsonRepairer
                 }
             }
 
+            if ($char === "'") {
+                $this->log('Converting single-quoted key to double quotes');
+            }
+
             // Track where the key starts
             $this->currentKeyStart = strlen($this->output);
             $this->output .= '"';
@@ -590,6 +622,7 @@ class JsonRepairer
         $smartQuoteLength = $this->getSmartQuoteLength($json, $i);
 
         if ($smartQuoteLength > 0) {
+            $this->log('Converting smart/curly quote to standard double quote');
             $this->currentKeyStart = strlen($this->output);
             $this->output .= '"';
             $this->inString = true;
@@ -602,6 +635,7 @@ class JsonRepairer
 
         // Unquoted key
         if (ctype_alnum($char) || $char === '_' || $char === '-') {
+            $this->log('Adding quotes around unquoted key');
             // Track where the key starts
             $this->currentKeyStart = strlen($this->output);
             $this->output .= '"';
@@ -650,6 +684,7 @@ class JsonRepairer
 
         // Missing colon, insert it
         if (! ctype_space($char)) {
+            $this->log('Inserting missing colon after key');
             $this->output .= ':';
             $this->state = self::STATE_IN_OBJECT_VALUE;
 
@@ -724,8 +759,10 @@ class JsonRepairer
                 $this->output = $trimmedOutput;
 
                 if ($this->omitEmptyValues) {
+                    $this->log('Removing key with missing value (omitEmptyValues enabled)');
                     $this->removeCurrentKey();
                 } else {
+                    $this->log('Adding empty string for missing value');
                     $this->output .= '""';
                 }
             }
@@ -742,7 +779,16 @@ class JsonRepairer
         $matchResult = preg_match('/^(true|false|null|True|False|None)\b/i', substr($json, $i), $matches);
 
         if ($matchResult === 1) {
-            $this->output .= $this->normalizeBoolean($matches[1]);
+            $normalized = $this->normalizeBoolean($matches[1]);
+
+            if ($matches[1] !== $normalized) {
+                $this->log('Normalizing boolean/null value', [
+                    'from' => $matches[1],
+                    'to' => $normalized,
+                ]);
+            }
+
+            $this->output .= $normalized;
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
             // Reset key tracking after successfully completing a boolean/null value
             $this->currentKeyStart = -1;
@@ -760,8 +806,10 @@ class JsonRepairer
         // Missing value
         if ($char === ',' || $char === '}') {
             if ($this->omitEmptyValues) {
+                $this->log('Removing key with missing value (omitEmptyValues enabled)');
                 $this->removeCurrentKey();
             } else {
+                $this->log('Adding empty string for missing value');
                 $this->output .= '""';
             }
 
@@ -785,6 +833,8 @@ class JsonRepairer
 
         // Handle unquoted string values
         if (ctype_alpha($char) || $char === '_') {
+            $this->log('Found unquoted string value, adding quotes');
+
             return $this->handleUnquotedStringValue($json, $i);
         }
 
@@ -902,6 +952,7 @@ class JsonRepairer
 
         // Missing comma, insert it
         if (! ctype_space($char) && $char !== $top) {
+            $this->log('Inserting missing comma');
             $this->output .= ',';
             $this->state = $top === '}' ? self::STATE_IN_OBJECT_KEY : self::STATE_IN_ARRAY;
 
@@ -989,27 +1040,39 @@ class JsonRepairer
      * unicode escapes (\uXXXX). Invalid or incomplete escapes are treated
      * as literal backslash followed by the character.
      */
-    private function handleEscapeSequence(string $char): void
+    /**
+     * Handle an escape sequence within a string.
+     *
+     * Processes escape sequences like \", \\, \/, \b, \f, \n, \r, \t, and
+     * unicode escapes (\uXXXX). Invalid or incomplete escapes are treated
+     * as escaped backslash followed by the character.
+     *
+     * @return int Number of extra characters consumed beyond the escape character itself
+     */
+    private function handleEscapeSequence(string $char, string $json): int
     {
         $validEscapes = ['"', '\\', '/', 'b', 'f', 'n', 'r', 't'];
 
         if (in_array($char, $validEscapes, true)) {
             $this->output .= '\\' . $char;
 
-            return;
+            return 0;
         }
 
-        if ($char === 'u' && $this->pos + 4 < strlen($this->json)) {
-            $hex = substr($this->json, $this->pos + 1, 4);
+        if ($char === 'u' && $this->pos + 4 < strlen($json)) {
+            $hex = substr($json, $this->pos + 1, 4);
 
             if (ctype_xdigit($hex)) {
                 $this->output .= '\\u' . $hex;
 
-                return;
+                return 4; // Consumed 4 extra hex digits
             }
         }
 
-        $this->output .= '\\' . $char;
+        // Invalid escape sequence - escape the backslash and output the character literally
+        $this->output .= '\\\\' . $char;
+
+        return 0;
     }
 
     /**
@@ -1034,6 +1097,7 @@ class JsonRepairer
         $trimmed = rtrim($this->output);
 
         if (str_ends_with($trimmed, ',')) {
+            $this->log('Removing trailing comma');
             $this->output = substr($trimmed, 0, -1);
         }
     }
@@ -1381,5 +1445,33 @@ class JsonRepairer
         }
 
         return 0;
+    }
+
+    /**
+     * Log a repair action with context.
+     *
+     * @param string $message Description of the repair action
+     * @param array<string, mixed> $context Additional context data
+     */
+    private function log(string $message, array $context = []): void
+    {
+        $this->logger?->debug($message, array_merge([
+            'position' => $this->pos,
+            'context' => $this->getContextSnippet(),
+        ], $context));
+    }
+
+    /**
+     * Get a snippet of the JSON around the current position for logging context.
+     */
+    private function getContextSnippet(int $window = 15): string
+    {
+        $start = max(0, $this->pos - $window);
+        $end = min(strlen($this->json), $this->pos + $window);
+
+        $before = substr($this->json, $start, $this->pos - $start);
+        $after = substr($this->json, $this->pos, $end - $this->pos);
+
+        return $before . '>>>' . $after;
     }
 }

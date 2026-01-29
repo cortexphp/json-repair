@@ -239,9 +239,13 @@ dataset('streaming_llm_responses', [
         '{"message": "Hello\\',
         '{"message": "Hello"}',
     ],
-    'cut off mid-unicode-escape' => [
+    'cut off mid-complete-unicode-escape' => [
         '{"emoji": "\\u263a',
-        '{"emoji": "\\\\u263a263a"}',
+        '{"emoji": "\\u263a"}',
+    ],
+    'cut off mid-incomplete-unicode-escape' => [
+        '{"emoji": "\\u26',
+        '{"emoji": "\\\\u26"}',
     ],
     'multiple-incomplete-values' => [
         '{"name": "John", "age": 30, "bio": "A developer who loves',
