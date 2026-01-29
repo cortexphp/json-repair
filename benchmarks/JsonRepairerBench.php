@@ -11,7 +11,7 @@ use function Cortex\JsonRepair\json_repair_decode;
 
 /**
  * @Revs(100)
- * @Iterations(20)
+ * @Iterations(10)
  * @Warmup(2)
  */
 class JsonRepairerBench
@@ -41,7 +41,15 @@ class JsonRepairerBench
     }
 
     /**
+     * Benchmarks large JSON repair.
+     *
+     * Note: This benchmark uses fewer revs/iterations since it processes
+     * 1000 items and takes ~44ms per run. Use --filter=benchRepairLargeJson
+     * to run it separately.
+     *
      * @ParamProviders({"provideLargeJson"})
+     * @Revs(10)
+     * @Iterations(5)
      */
     public function benchRepairLargeJson(array $params): void
     {
@@ -79,6 +87,16 @@ class JsonRepairerBench
     public function benchRepairStreamingJson(array $params): void
     {
         json_repair($params['json']);
+    }
+
+    /**
+     * Baseline: compare repair overhead against native json_decode on valid JSON.
+     *
+     * @ParamProviders({"provideValidJson"})
+     */
+    public function benchNativeJsonDecodeBaseline(array $params): void
+    {
+        json_decode($params['json']);
     }
 
     /**
@@ -141,7 +159,7 @@ class JsonRepairerBench
         $brokenJson = rtrim($brokenJson, '}') . ',}';
 
         return [
-            'large_array' => ['json' => $brokenJson],
+            'large_array_broken' => ['json' => $brokenJson],
         ];
     }
 
