@@ -349,6 +349,37 @@ dataset('json_in_strings', [
     ],
 ]);
 
+dataset('comments', [
+    'single line comment' => [
+        '{"key": "value", // comment',
+        '{"key": "value"}',
+    ],
+    'multi line comment' => [
+        '{"key": "value", /* comment */',
+        '{"key": "value"}',
+    ],
+    'multiple comments' => [
+        "{// User information\n\"name\": \"John\", /* Age in years */ \"age\": 30}",
+        '{"name": "John", "age": 30}',
+    ],
+    'comment inside array' => [
+        "[1, // second\n2, 3]",
+        '[1, 2, 3]',
+    ],
+    'inline comment between properties' => [
+        '{"a": 1 /* keep a */, "b": 2}',
+        '{"a": 1, "b": 2}',
+    ],
+    'multi line comment with newline' => [
+        "{\n\"a\": 1, /*\ncomment\n*/ \"b\": 2}",
+        '{"a": 1, "b": 2}',
+    ],
+    'comment after last property' => [
+        '{"a": 1 // trailing',
+        '{"a": 1}',
+    ],
+]);
+
 // ============================================================================
 // SPECIAL CHARACTERS & ESCAPING
 // ============================================================================

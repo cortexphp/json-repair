@@ -345,14 +345,11 @@ describe('Edge cases and special features', function (): void {
         ]);
     });
 
-    it('removes comments', function (): void {
-        $result = json_repair('{"key": "value"} // comment');
+    it('removes comments', function (string $input, string $expected): void {
+        $result = json_repair($input);
         expect(json_validate($result))->toBeTrue();
-        $decoded = json_decode($result, true);
-        expect($decoded)->toBe([
-            'key' => 'value',
-        ]);
-    });
+        expect($result)->toBe($expected);
+    })->with('comments');
 });
 
 describe('Options', function (): void {
