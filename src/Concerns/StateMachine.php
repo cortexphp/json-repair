@@ -20,7 +20,14 @@ trait StateMachine
      *
      * @return int The next position to parse
      */
-    private function handleStart(string $json, int $i): int
+    /**
+     * If the character at $i is { or [, output it, push the closing delimiter
+     * to the stack, set the appropriate state, and return the next index.
+     * Optionally reset key tracking when opening a nested structure as a value.
+     *
+     * @return int|null The next position to parse, or null if not { or [
+     */
+    private function tryOpenObjectOrArray(string $json, int $i, bool $resetKeyTracking = false): ?int
     {
         $char = $json[$i];
 
@@ -28,6 +35,10 @@ trait StateMachine
             $this->output .= '{';
             $this->stack[] = '}';
             $this->state = self::STATE_IN_OBJECT_KEY;
+
+            if ($resetKeyTracking) {
+                $this->currentKeyStart = -1;
+            }
 
             return $i + 1;
         }
@@ -37,7 +48,22 @@ trait StateMachine
             $this->stack[] = ']';
             $this->state = self::STATE_IN_ARRAY;
 
+            if ($resetKeyTracking) {
+                $this->currentKeyStart = -1;
+            }
+
             return $i + 1;
+        }
+
+        return null;
+    }
+
+    private function handleStart(string $json, int $i): int
+    {
+        $next = $this->tryOpenObjectOrArray($json, $i);
+
+        if ($next !== null) {
+            return $next;
         }
 
         // Unexpected character at start
@@ -234,24 +260,10 @@ trait StateMachine
     {
         $char = $json[$i];
 
-        if ($char === '{') {
-            $this->output .= '{';
-            $this->stack[] = '}';
-            $this->state = self::STATE_IN_OBJECT_KEY;
-            // Reset key tracking when starting a nested object (this is a value, not a key)
-            $this->currentKeyStart = -1;
+        $next = $this->tryOpenObjectOrArray($json, $i, true);
 
-            return $i + 1;
-        }
-
-        if ($char === '[') {
-            $this->output .= '[';
-            $this->stack[] = ']';
-            $this->state = self::STATE_IN_ARRAY;
-            // Reset key tracking when starting a nested array (this is a value, not a key)
-            $this->currentKeyStart = -1;
-
-            return $i + 1;
+        if ($next !== null) {
+            return $next;
         }
 
         if ($char === '"' || $char === "'") {
@@ -390,20 +402,10 @@ trait StateMachine
             return $i + 1;
         }
 
-        if ($char === '{') {
-            $this->output .= '{';
-            $this->stack[] = '}';
-            $this->state = self::STATE_IN_OBJECT_KEY;
+        $next = $this->tryOpenObjectOrArray($json, $i);
 
-            return $i + 1;
-        }
-
-        if ($char === '[') {
-            $this->output .= '[';
-            $this->stack[] = ']';
-            $this->state = self::STATE_IN_ARRAY;
-
-            return $i + 1;
+        if ($next !== null) {
+            return $next;
         }
 
         if ($char === '"' || $char === "'") {
