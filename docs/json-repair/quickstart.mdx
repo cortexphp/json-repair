@@ -1,0 +1,47 @@
+---
+title: Quick Start
+description: 'Get up and running with JSON Repair in minutes'
+icon: 'rocket'
+---
+
+## Helper Function
+
+Use `json_repair()` for a simple one-liner:
+
+```php
+use function Cortex\JsonRepair\json_repair;
+
+$repaired = json_repair("{'key': 'value'}");
+// {"key": "value"}
+```
+
+To repair and decode in one step, use `json_repair_decode()`:
+
+```php
+use function Cortex\JsonRepair\json_repair_decode;
+
+$data = json_repair_decode("{'key': 'value', 'number': 123}");
+// ['key' => 'value', 'number' => 123]
+```
+
+## JsonRepairer Class
+
+For more control (options, logging), use the class directly:
+
+```php
+use Cortex\JsonRepair\JsonRepairer;
+
+$repairer = new JsonRepairer("{'key': 'value'}");
+$repaired = $repairer->repair();
+// {"key": "value"}
+
+// Or decode directly
+$data = $repairer->decode();
+// ['key' => 'value']
+```
+
+## Next Steps
+
+- See [Repair Examples](/json-repair/repair-examples) for what gets fixed
+- Configure [omitEmptyValues](/json-repair/configuration#omitemptyvalues) and [omitIncompleteStrings](/json-repair/configuration#omitincompletestrings) for streaming LLM output
+- Attach a [PSR-3 logger](/json-repair/logging) for debugging

@@ -1,0 +1,19 @@
+name: Sync Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+
+jobs:
+  notify-docs-repo:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DOCS_TOKEN }}
+          repository: cortexphp/docs
+          event-type: docs-updated

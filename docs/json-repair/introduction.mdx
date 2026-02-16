@@ -1,0 +1,57 @@
+---
+title: Introduction
+description: 'Repair invalid JSON strings by fixing common syntax errors like single quotes, unquoted keys, trailing commas, and missing brackets. Perfect for parsing LLM outputs and malformed API responses.'
+icon: 'book-open'
+---
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Quote and Key Repair"
+    href="/json-repair/repair-examples#quotes"
+    icon="quote"
+  >
+    Converts single quotes to double quotes, adds quotes around unquoted keys and values, and handles mixed quote styles.
+  </Card>
+  <Card
+    title="Bracket Completion"
+    href="/json-repair/repair-examples#brackets"
+    icon="brackets"
+  >
+    Adds missing closing brackets and braces, closes unclosed strings, and repairs incomplete JSON from streaming responses.
+  </Card>
+  <Card
+    title="LLM Output Handling"
+    href="/json-repair/repair-examples#llm-streaming"
+    icon="message-square"
+  >
+    Handles truncated JSON from streaming LLM responses, Python-style booleans (True/False/None), and comments.
+  </Card>
+  <Card
+    title="Markdown Extraction"
+    href="/json-repair/repair-examples#markdown"
+    icon="code"
+  >
+    Extracts JSON from markdown code blocks, stripping surrounding text and backticks.
+  </Card>
+</CardGroup>
+
+## About This Package
+
+JSON Repair fixes malformed JSON from LLMs, APIs, and user input. It handles common syntax errors that cause `json_decode()` to fail: single quotes, unquoted keys, trailing commas, missing brackets, and more.
+
+## Quick Example
+
+```php
+use function Cortex\JsonRepair\json_repair;
+
+$broken = "{'name': 'John', age: 30, active: true,}";
+$repaired = json_repair($broken);
+
+// {"name": "John", "age": 30, "active": true}
+```
+
+<Note>
+  Get started with the [Quick Start](/json-repair/quickstart) guide.
+</Note>
