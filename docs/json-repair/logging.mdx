@@ -1,0 +1,53 @@
+---
+title: Logging
+description: 'Debug repair actions with a PSR-3 logger'
+icon: 'terminal'
+---
+
+Attach a PSR-3 logger to see what repairs are applied. Logs are emitted at `debug` level.
+
+## With the Helper Function
+
+Pass a logger as the `logger` parameter:
+
+```php
+use function Cortex\JsonRepair\json_repair;
+use Psr\Log\LoggerInterface;
+
+$logger = new MyLogger(); // Any PSR-3 implementation
+$result = json_repair('{"key": "value', logger: $logger);
+```
+
+## With the Class
+
+Use `setLogger()` before calling `repair()` or `decode()`:
+
+```php
+use Cortex\JsonRepair\JsonRepairer;
+
+$repairer = new JsonRepairer("{'key': 'value'}");
+$repairer->setLogger($logger);
+$result = $repairer->repair();
+```
+
+## Log Messages
+
+Valid JSON produces a single log entry:
+
+- `JSON is already valid, returning as-is`
+
+When repairs occur, you'll see messages such as:
+
+- `Starting JSON repair`
+- `Adding missing closing quote for unclosed string`
+- `Adding missing closing bracket/brace`
+- `Converting single-quoted key to double quotes`
+- `Normalizing boolean/null value` (with context: `from: 'True', to: 'true'`)
+- `Adding quotes around unquoted key`
+- `Found unquoted string value, adding quotes`
+- `Inserting missing comma`
+- `Inserting missing colon after key`
+- `Extracted JSON from markdown code block`
+- `Removing key with missing value (omitEmptyValues enabled)`
+
+Log entries include `position` and `context` with `>>>` markers showing where the repair occurred.

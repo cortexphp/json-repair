@@ -1,0 +1,75 @@
+{
+    "$schema": "https://mintlify.com/docs.json",
+    "theme": "aspen",
+    "name": "CortexPHP",
+    "colors": {
+        "primary": "#1C85FE",
+        "light": "#1C85FE",
+        "dark": "#1C85FE"
+    },
+    "favicon": "/assets/favicon.svg",
+    "icons": {
+        "library": "lucide"
+    },
+    "navbar": {
+        "links": [
+            {
+                "label": "GitHub",
+                "icon": "github",
+                "href": "https://github.com/cortexphp"
+            }
+        ]
+    },
+    "navigation": {
+        "products": [
+            {
+                "product": "JSON Repair",
+                "icon": "shield-ellipsis",
+                "groups": [
+                    {
+                        "group": "Get Started",
+                        "pages": [
+                            "json-repair/introduction",
+                            "json-repair/installation",
+                            "json-repair/quickstart"
+                        ]
+                    },
+                    {
+                        "group": "Usage",
+                        "pages": [
+                            "json-repair/repair-examples",
+                            "json-repair/configuration",
+                            "json-repair/logging"
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "logo": {
+        "light": "/assets/logo-light.svg",
+        "dark": "/assets/logo-dark.svg"
+    },
+    "styling": {
+        "codeblocks": {
+            "theme": {
+                "light": "github-light-high-contrast",
+                "dark": "github-dark"
+            }
+        }
+    },
+    "contextual": {
+        "options": [
+            "copy",
+            "view",
+            "chatgpt",
+            "claude"
+        ]
+    },
+    "footer": {
+        "socials": {
+            "github": "https://github.com/cortexphp",
+            "x": "https://twitter.com/cortexphp"
+        }
+    }
+}

@@ -1,0 +1,94 @@
+---
+title: Configuration
+description: 'Options for customizing JSON repair behavior'
+icon: 'settings'
+---
+
+## ensureAscii
+
+When `true` (default), non-ASCII characters are escaped. When `false`, Unicode is preserved.
+
+```php
+use function Cortex\JsonRepair\json_repair;
+
+// ensureAscii: true (default) - escapes Unicode
+json_repair("{'test_中国人_ascii':'统一码'}", ensureAscii: true);
+// {"test_中国人_ascii":"\u7edf\u4e00\u7801"}
+
+// ensureAscii: false - preserves Unicode
+json_repair("{'test_中国人_ascii':'统一码'}", ensureAscii: false);
+// {"test_中国人_ascii":"统一码"}
+```
+
+## omitEmptyValues
+
+When `true`, keys with missing values are removed instead of being set to empty strings. Useful for streaming JSON where `{"key": }` should become `{}`.
+
+```php
+use function Cortex\JsonRepair\json_repair;
+
+// omitEmptyValues: false (default)
+json_repair('{"key": }');
+// {"key":""}
+
+// omitEmptyValues: true
+json_repair('{"key": }', omitEmptyValues: true);
+// {}
+
+json_repair('{"key1": "v1", "key2": }', omitEmptyValues: true);
+// {"key1": "v1"}
+
+json_repair('{"user": {"name": "John", "age": }}', omitEmptyValues: true);
+// {"user": {"name": "John"}}
+```
+
+## omitIncompleteStrings
+
+When `true`, keys with incomplete (truncated) string values are removed. Useful for streaming LLM output where you prefer to drop partial strings rather than close them.
+
+```php
+use function Cortex\JsonRepair\json_repair;
+
+// omitIncompleteStrings: false (default)
+json_repair('{"name": "John", "description": "A person who');
+// {"name": "John", "description": "A person who"}
+
+// omitIncompleteStrings: true
+json_repair('{"name": "John", "description": "A person who', omitIncompleteStrings: true);
+// {"name": "John"}
+
+json_repair('{"key": "val', omitIncompleteStrings: true);
+// {}
+
+json_repair('{"complete": "value", "incomplete": "partial', omitIncompleteStrings: true);
+// {"complete": "value"}
+```
+
+## Combined Options
+
+Use both options together for streaming LLM output:
+
+```php
+use function Cortex\JsonRepair\json_repair_decode;
+
+$data = json_repair_decode(
+    '{"name": "John", "age": , "bio": "A developer who',
+    omitEmptyValues: true,
+    omitIncompleteStrings: true
+);
+// ['name' => 'John']
+```
+
+With the class:
+
+```php
+use Cortex\JsonRepair\JsonRepairer;
+
+$repairer = new JsonRepairer(
+    '{"key1": "v1", "key2": , "key3": "partial',
+    omitEmptyValues: true,
+    omitIncompleteStrings: true
+);
+$repaired = $repairer->repair();
+// {"key1": "v1"}
+```

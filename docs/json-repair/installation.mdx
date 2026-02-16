@@ -1,0 +1,47 @@
+---
+title: Installation
+description: 'Install and set up the JSON Repair package'
+icon: 'terminal'
+---
+
+## Requirements
+
+- PHP 8.3+
+- JSON PHP extension
+- Composer for dependency management
+
+## Installation
+
+```bash
+composer require cortexphp/json-repair
+```
+
+## Development Setup
+
+### For Package Development
+
+If you're contributing to the package or want to run tests:
+
+<Steps>
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/cortexphp/json-repair.git
+    cd json-repair
+    ```
+  </Step>
+  <Step title="Install Dependencies">
+    ```bash
+    composer install
+    ```
+  </Step>
+  <Step title="Run Tests">
+    ```bash
+    composer test
+    ```
+  </Step>
+  <Step title="Run Tests and Code Quality Tools">
+    ```bash
+    composer check
+    ```
+  </Step>
+</Steps>

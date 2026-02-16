@@ -1,0 +1,159 @@
+---
+title: Repair Examples
+description: 'What JSON Repair fixes, with before/after examples from the test suite'
+icon: 'wrench'
+---
+
+## Quotes
+
+Single quotes, unquoted keys, and unquoted values are converted to valid JSON.
+
+<CodeGroup>
+  ```php Input
+  json_repair("{'key': 'value'}");
+  json_repair('{name: "John", age: 30}');
+  json_repair("{'key': 'string', \"key4\": unquoted}");
+  ```
+
+  ```json Output
+  {"key": "value"}
+  {"name": "John", "age": 30}
+  {"key": "string", "key4": "unquoted"}
+  ```
+</CodeGroup>
+
+Quotes inside string values are escaped:
+
+<CodeGroup>
+  ```php Input
+  json_repair('{"key": "v"alu"e"}');
+  ```
+
+  ```json Output
+  {"key": "v\"alu\"e"}
+  ```
+</CodeGroup>
+
+## Commas and Colons
+
+Trailing commas are removed; missing commas and colons are inserted.
+
+<CodeGroup>
+  ```php Input
+  json_repair('{"key": "value",}');
+  json_repair('[1, 2, 3,]');
+  json_repair('{"key1": "v1" "key2": "v2"}');
+  json_repair('{"key" "value"}');
+  ```
+
+  ```json Output
+  {"key": "value"}
+  [1, 2, 3]
+  {"key1": "v1","key2": "v2"}
+  {"key": "value"}
+  ```
+</CodeGroup>
+
+## Brackets
+
+Missing closing brackets and braces are added. Unclosed strings are closed.
+
+<CodeGroup>
+  ```php Input
+  json_repair('{"key": "value"');
+  json_repair('["a", "b"');
+  json_repair('{"key": "val');
+  json_repair('{"key1": {"key2": "value"');
+  ```
+
+  ```json Output
+  {"key": "value"}
+  ["a", "b"]
+  {"key": "val"}
+  {"key1": {"key2": "value"}}
+  ```
+</CodeGroup>
+
+## Values
+
+Python-style booleans and null are normalized. Missing values become empty strings (or are omitted with [omitEmptyValues](/json-repair/configuration#omitemptyvalues)).
+
+<CodeGroup>
+  ```php Input
+  json_repair('{"key": True}');
+  json_repair('{"key": False}');
+  json_repair('{"key": None}');
+  json_repair('[True, False, None]');
+  json_repair('{"key": }');
+  ```
+
+  ```json Output
+  {"key": true}
+  {"key": false}
+  {"key": null}
+  [true, false, null]
+  {"key":""}
+  ```
+</CodeGroup>
+
+## Comments
+
+Single-line (`//`) and block (`/* */`) comments are removed.
+
+<CodeGroup>
+  ```php Input
+  json_repair('{"key": "value", // comment');
+  json_repair('{"key": "value", /* comment */');
+  json_repair("{// User information\n\"name\": \"John\", /* Age in years */ \"age\": 30}");
+  ```
+
+  ```json Output
+  {"key": "value"}
+  {"key": "value"}
+  {"name": "John", "age": 30}
+  ```
+</CodeGroup>
+
+## Markdown
+
+JSON is extracted from markdown code blocks. Surrounding text and backticks are stripped.
+
+<CodeGroup>
+  ```php Input
+  json_repair('lorem ```json {"key":"value"} ``` ipsum');
+  json_repair("Based on the information extracted: ```json { 'a': 'b' } ```");
+  json_repair('````{ "key": "value" }```');
+  ```
+
+  ```json Output
+  {"key":"value"}
+  {"a": "b"}
+  {"key": "value"}
+  ```
+</CodeGroup>
+
+## LLM Streaming
+
+Incomplete JSON from streaming LLM responses is repaired by closing strings, numbers, and structures.
+
+<CodeGroup>
+  ```php Input
+  json_repair('{"name": "John", "description": "A person who');
+  json_repair('{"count": 123');
+  json_repair('{"user": {"name": "John", "age": 30');
+  json_repair('{"items": [1, 2, 3');
+  json_repair('{"message": "Hello\\');
+  ```
+
+  ```json Output
+  {"name": "John", "description": "A person who"}
+  {"count": 123}
+  {"user": {"name": "John", "age": 30}}
+  {"items": [1, 2, 3]}
+  {"message": "Hello"}
+  ```
+</CodeGroup>
+
+<Note>
+  For streaming output, enable [omitIncompleteStrings](/json-repair/configuration#omitincompletestrings) to drop truncated string values instead of closing them.
+</Note>
