@@ -37,19 +37,19 @@ icon: 'book-open'
   </Card>
 </CardGroup>
 
-## About This Package
-
-JSON Repair fixes malformed JSON from LLMs, APIs, and user input. It handles common syntax errors that cause `json_decode()` to fail: single quotes, unquoted keys, trailing commas, missing brackets, and more.
-
 ## Quick Example
 
 ```php
 use function Cortex\JsonRepair\json_repair;
+use function Cortex\JsonRepair\json_repair_decode;
 
 $broken = "{'name': 'John', age: 30, active: true,}";
-$repaired = json_repair($broken);
 
+$json = json_repair($broken);
 // {"name": "John", "age": 30, "active": true}
+
+$data = json_repair_decode($broken);
+// ['name' => 'John', 'age' => 30, 'active' => true]
 ```
 
 <Note>
