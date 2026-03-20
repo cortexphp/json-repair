@@ -188,6 +188,7 @@ trait StateMachine
             while ($i < $length && (ctype_alnum($json[$i]) || $json[$i] === '_' || $json[$i] === '-')) {
                 $i++;
             }
+
             $this->output .= substr($json, $keyStart, $i - $keyStart);
             $this->output .= '"';
             $this->state = self::STATE_EXPECTING_COLON;
@@ -514,6 +515,7 @@ trait StateMachine
         while ($i < $length && ctype_digit($json[$i])) {
             $i++;
         }
+
         if ($i > $start) {
             $this->output .= substr($json, $start, $i - $start);
         }
@@ -526,6 +528,7 @@ trait StateMachine
             while ($i < $length && ctype_digit($json[$i])) {
                 $i++;
             }
+
             if ($i > $start) {
                 $this->output .= substr($json, $start, $i - $start);
             }
@@ -757,6 +760,21 @@ trait StateMachine
     }
 
     /**
+     * Boolean / null keyword literals for {@see tryMatchKeyword()} (substr_compare + word boundary).
+     *
+     * @return list<array{0: string, 1: int, 2: string}> Each tuple: keyword text, byte length, normalized JSON token.
+     */
+    private static function keywordMatchSpecs(): array
+    {
+        return [
+            ['true', 4, 'true'],
+            ['false', 5, 'false'],
+            ['null', 4, 'null'],
+            ['none', 4, 'null'],
+        ];
+    }
+
+    /**
      * Try to match a boolean or null keyword at the given position without regex.
      *
      * Uses substr_compare to avoid creating a substring and bypasses the regex
@@ -771,19 +789,11 @@ trait StateMachine
         $c = $json[$i];
 
         // Quick first-char gate before doing heavier work
-        if ($c !== 't' && $c !== 'T' && $c !== 'f' && $c !== 'F' && $c !== 'n' && $c !== 'N') {
+        if (! in_array($c, ['t', 'T', 'f', 'F', 'n', 'N'], true)) {
             return null;
         }
 
-        // [keyword => [length, normalized_value]]
-        static $keywords = [
-            'true'  => [4, 'true'],
-            'false' => [5, 'false'],
-            'null'  => [4, 'null'],
-            'none'  => [4, 'null'],
-        ];
-
-        foreach ($keywords as $keyword => [$klen, $normalized]) {
+        foreach (self::keywordMatchSpecs() as [$keyword, $klen, $normalized]) {
             if ($length - $i >= $klen && substr_compare($json, $keyword, $i, $klen, true) === 0) {
                 $afterPos = $i + $klen;
 
