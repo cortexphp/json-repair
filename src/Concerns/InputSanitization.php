@@ -47,6 +47,11 @@ trait InputSanitization
      */
     private function removeComments(string $input): string
     {
+        // Fast path: if no comment markers exist, return as-is without scanning
+        if (! str_contains($input, '//') && ! str_contains($input, '/*')) {
+            return $input;
+        }
+
         $length = strlen($input);
         $output = '';
         $inString = false;

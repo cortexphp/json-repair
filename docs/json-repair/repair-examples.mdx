@@ -19,11 +19,28 @@ json_repair("{'key': 'string', \"key4\": unquoted}");
 // {"key": "string", "key4": "unquoted"}
 ```
 
+Typographic (smart/curly) quotes are normalised to standard double quotes:
+
+```php
+json_repair('{"key": "value"}');
+// {"key": "value"}
+
+json_repair("{'key': 'value'}");
+// {"key": "value"}
+```
+
 Quotes inside string values are escaped:
 
 ```php
 json_repair('{"key": "v"alu"e"}');
 // {"key": "v\"alu\"e"}
+```
+
+Invalid escape sequences are double-escaped so the output stays valid:
+
+```php
+json_repair('{"key": "foo\qbar"}');
+// {"key": "foo\\qbar"}
 ```
 
 ## Commas and Colons

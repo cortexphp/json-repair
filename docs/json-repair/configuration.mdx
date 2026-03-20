@@ -12,12 +12,12 @@ When `true` (default), non-ASCII characters are escaped. When `false`, Unicode i
 use function Cortex\JsonRepair\json_repair;
 
 // ensureAscii: true (default) - escapes Unicode
-json_repair("{'test_中国人_ascii':'统一码'}", ensureAscii: true);
-// {"test_中国人_ascii":"\u7edf\u4e00\u7801"}
+json_repair("{'city':'上海'}", ensureAscii: true);
+// {"city":"\u4e0a\u6d77"}
 
 // ensureAscii: false - preserves Unicode
-json_repair("{'test_中国人_ascii':'统一码'}", ensureAscii: false);
-// {"test_中国人_ascii":"统一码"}
+json_repair("{'city':'上海'}", ensureAscii: false);
+// {"city":"上海"}
 ```
 
 ## omitEmptyValues

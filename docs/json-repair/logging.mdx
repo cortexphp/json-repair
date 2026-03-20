@@ -39,15 +39,22 @@ Valid JSON produces a single log entry:
 When repairs occur, you'll see messages such as:
 
 - `Starting JSON repair`
-- `Adding missing closing quote for unclosed string`
-- `Adding missing closing bracket/brace`
+- `Extracted JSON from markdown code block`
+- `Removed comments from JSON`
+- `Removing single-line comment`
+- `Removing multi-line comment`
 - `Converting single-quoted key to double quotes`
-- `Normalizing boolean/null value` (with context: `from: 'True', to: 'true'`)
+- `Converting smart/curly quote to standard double quote`
+- `Found doubled quote delimiter pattern, normalizing key`
 - `Adding quotes around unquoted key`
 - `Found unquoted string value, adding quotes`
-- `Inserting missing comma`
 - `Inserting missing colon after key`
-- `Extracted JSON from markdown code block`
+- `Inserting missing comma`
+- `Removing trailing comma`
+- `Normalizing boolean/null value` (with context: `from: 'True', to: 'true'`)
+- `Adding missing closing quote for unclosed string`
+- `Removing incomplete string value (omitIncompleteStrings enabled)`
+- `Adding missing closing bracket/brace`
 - `Removing key with missing value (omitEmptyValues enabled)`
 
 Log entries include `position` and `context` with `>>>` markers showing where the repair occurred.

@@ -84,6 +84,7 @@ trait StateMachine
     private function handleObjectKey(string $json, int $i): int
     {
         $char = $json[$i];
+        $length = strlen($json);
 
         if ($char === '}') {
             $this->removeTrailingComma();
@@ -97,7 +98,7 @@ trait StateMachine
         if ($char === '"' || $char === "'") {
             // Check for double-quote delimiter pattern like ""key"" (slanted delimiter style)
             // If we have ""X where X is alphanumeric, skip the double quotes and read as unquoted key
-            if ($i + 2 < strlen($json) && $json[$i + 1] === $char) {
+            if ($i + 2 < $length && $json[$i + 1] === $char) {
                 $afterDoubleQuote = $json[$i + 2];
 
                 if (ctype_alnum($afterDoubleQuote) || $afterDoubleQuote === '_' || $afterDoubleQuote === ' ') {
@@ -109,20 +110,16 @@ trait StateMachine
                     $keyEnd = $keyStart;
 
                     // Read until we hit the closing "" or single " or : or }
-                    while ($keyEnd < strlen($json)) {
+                    while ($keyEnd < $length) {
                         $keyChar = $json[$keyEnd];
 
                         // Check for closing "" pattern
-                        if (($keyChar === '"' || $keyChar === "'") && $keyEnd + 1 < strlen(
-                            $json,
-                        ) && $json[$keyEnd + 1] === $keyChar) {
+                        if (($keyChar === '"' || $keyChar === "'") && $keyEnd + 1 < $length && $json[$keyEnd + 1] === $keyChar) {
                             break;
                         }
 
                         // Also stop at single quote followed by colon (end of key)
-                        if (($keyChar === '"' || $keyChar === "'") && $keyEnd + 1 < strlen(
-                            $json,
-                        ) && $json[$keyEnd + 1] === ':') {
+                        if (($keyChar === '"' || $keyChar === "'") && $keyEnd + 1 < $length && $json[$keyEnd + 1] === ':') {
                             break;
                         }
 
@@ -139,14 +136,12 @@ trait StateMachine
                     $this->state = self::STATE_EXPECTING_COLON;
 
                     // Skip past the closing "" if present
-                    if ($keyEnd + 1 < strlen(
-                        $json,
-                    ) && ($json[$keyEnd] === '"' || $json[$keyEnd] === "'") && $json[$keyEnd + 1] === $json[$keyEnd]) {
+                    if ($keyEnd + 1 < $length && ($json[$keyEnd] === '"' || $json[$keyEnd] === "'") && $json[$keyEnd + 1] === $json[$keyEnd]) {
                         return $keyEnd + 2;
                     }
 
                     // Skip past single closing " if present (followed by :)
-                    if ($keyEnd < strlen($json) && ($json[$keyEnd] === '"' || $json[$keyEnd] === "'")) {
+                    if ($keyEnd < $length && ($json[$keyEnd] === '"' || $json[$keyEnd] === "'")) {
                         return $keyEnd + 1;
                     }
 
@@ -184,17 +179,17 @@ trait StateMachine
             return $i + $smartQuoteLength;
         }
 
-        // Unquoted key
+        // Unquoted key — batch all key chars into one substr() append
         if (ctype_alnum($char) || $char === '_' || $char === '-') {
             $this->log('Adding quotes around unquoted key');
-            // Track where the key starts
             $this->currentKeyStart = strlen($this->output);
             $this->output .= '"';
-            while ($i < strlen($json) && (ctype_alnum($json[$i]) || $json[$i] === '_' || $json[$i] === '-')) {
-                $this->output .= $json[$i];
+            $keyStart = $i;
+            while ($i < $length && (ctype_alnum($json[$i]) || $json[$i] === '_' || $json[$i] === '-')) {
                 $i++;
             }
 
+            $this->output .= substr($json, $keyStart, $i - $keyStart);
             $this->output .= '"';
             $this->state = self::STATE_EXPECTING_COLON;
 
@@ -218,6 +213,7 @@ trait StateMachine
     private function handleExpectingColon(string $json, int $i): int
     {
         $char = $json[$i];
+        $length = strlen($json);
 
         if ($char === ':') {
             $this->output .= ':';
@@ -225,7 +221,7 @@ trait StateMachine
 
             // Preserve whitespace after colon
             $nextI = $i + 1;
-            while ($nextI < strlen($json) && $json[$nextI] === ' ') {
+            while ($nextI < $length && $json[$nextI] === ' ') {
                 $this->output .= ' ';
                 $nextI++;
             }
@@ -259,6 +255,7 @@ trait StateMachine
     private function handleObjectValue(string $json, int $i): int
     {
         $char = $json[$i];
+        $length = strlen($json);
 
         $next = $this->tryOpenObjectOrArray($json, $i, true);
 
@@ -270,9 +267,7 @@ trait StateMachine
             // Check for double quote at start of value (e.g., {"key": ""value"})
             // Skip the first quote if it's immediately followed by another quote and then non-quote content
             // Check what comes after the second quote
-            if ($i + 1 < strlen($json) && $json[$i + 1] === $char && ($i + 2 < strlen(
-                $json,
-            ) && $json[$i + 2] !== $char && $json[$i + 2] !== '}' && $json[$i + 2] !== ',')) {
+            if ($i + 1 < $length && $json[$i + 1] === $char && ($i + 2 < $length && $json[$i + 2] !== $char && $json[$i + 2] !== '}' && $json[$i + 2] !== ',')) {
                 // Pattern like ""value" - skip the empty quotes and use the value
                 // Skip the first quote entirely
                 return $i + 1;
@@ -313,14 +308,15 @@ trait StateMachine
         }
 
         // Handle non-standard booleans/null (True/False/None)
-        $matchResult = preg_match('/^(true|false|null|True|False|None)\b/i', substr($json, $i), $matches);
+        $keywordMatch = $this->tryMatchKeyword($json, $i, $length);
 
-        if ($matchResult === 1) {
-            $normalized = $this->normalizeBoolean($matches[1]);
+        if ($keywordMatch !== null) {
+            [$normalized, $klen] = $keywordMatch;
+            $original = substr($json, $i, $klen);
 
-            if ($matches[1] !== $normalized) {
+            if ($original !== $normalized) {
                 $this->log('Normalizing boolean/null value', [
-                    'from' => $matches[1],
+                    'from' => $original,
                     'to' => $normalized,
                 ]);
             }
@@ -330,7 +326,7 @@ trait StateMachine
             // Reset key tracking after successfully completing a boolean/null value
             $this->currentKeyStart = -1;
 
-            return $i + strlen($matches[1]);
+            return $i + $klen;
         }
 
         // Handle numbers
@@ -392,6 +388,7 @@ trait StateMachine
     private function handleArrayValue(string $json, int $i): int
     {
         $char = $json[$i];
+        $length = strlen($json);
 
         if ($char === ']') {
             $this->removeTrailingComma();
@@ -419,13 +416,14 @@ trait StateMachine
         }
 
         // Handle non-standard booleans/null (True/False/None)
-        $matchResult = preg_match('/^(true|false|null|True|False|None)\b/i', substr($json, $i), $matches);
+        $keywordMatch = $this->tryMatchKeyword($json, $i, $length);
 
-        if ($matchResult === 1) {
-            $this->output .= $this->normalizeBoolean($matches[1]);
+        if ($keywordMatch !== null) {
+            [$normalized, $klen] = $keywordMatch;
+            $this->output .= $normalized;
             $this->state = self::STATE_EXPECTING_COMMA_OR_END;
 
-            return $i + strlen($matches[1]);
+            return $i + $klen;
         }
 
         // Handle numbers
@@ -469,7 +467,8 @@ trait StateMachine
 
             // Preserve whitespace after comma
             $nextI = $i + 1;
-            while ($nextI < strlen($json) && $json[$nextI] === ' ') {
+            $length = strlen($json);
+            while ($nextI < $length && $json[$nextI] === ' ') {
                 $this->output .= ' ';
                 $nextI++;
             }
@@ -511,19 +510,27 @@ trait StateMachine
             $i++;
         }
 
-        // Handle integer part
+        // Handle integer part — batch all digits into one substr() append
+        $start = $i;
         while ($i < $length && ctype_digit($json[$i])) {
-            $this->output .= $json[$i];
             $i++;
+        }
+
+        if ($i > $start) {
+            $this->output .= substr($json, $start, $i - $start);
         }
 
         // Handle decimal point
         if ($i < $length && $json[$i] === '.') {
             $this->output .= '.';
             $i++;
+            $start = $i;
             while ($i < $length && ctype_digit($json[$i])) {
-                $this->output .= $json[$i];
                 $i++;
+            }
+
+            if ($i > $start) {
+                $this->output .= substr($json, $start, $i - $start);
             }
         }
 
@@ -538,18 +545,17 @@ trait StateMachine
                 $i++;
             }
 
-            $hasExponentDigits = false;
+            // Batch exponent digits; track where they start to detect empty exponent
+            $digitStart = $i;
             while ($i < $length && ctype_digit($json[$i])) {
-                $this->output .= $json[$i];
                 $i++;
-                $hasExponentDigits = true;
             }
 
-            // If we started an exponent but don't have digits, remove the incomplete exponent
-            if (! $hasExponentDigits) {
-                // Remove the 'e' or 'E' and optional sign
-                $exponentLength = $i - $exponentStart;
-                $this->output = substr($this->output, 0, -$exponentLength);
+            if ($i > $digitStart) {
+                $this->output .= substr($json, $digitStart, $i - $digitStart);
+            } else {
+                // No digits after 'e'/'E' — remove the incomplete exponent (letter + optional sign)
+                $this->output = substr($this->output, 0, -($digitStart - $exponentStart));
             }
         }
 
@@ -751,5 +757,53 @@ trait StateMachine
     private function escapeStringValue(string $value): string
     {
         return str_replace(['\\', '"'], ['\\\\', '\\"'], $value);
+    }
+
+    /**
+     * Boolean / null keyword literals for {@see tryMatchKeyword()} (substr_compare + word boundary).
+     *
+     * @return list<array{0: string, 1: int, 2: string}> Each tuple: keyword text, byte length, normalized JSON token.
+     */
+    private static function keywordMatchSpecs(): array
+    {
+        return [
+            ['true', 4, 'true'],
+            ['false', 5, 'false'],
+            ['null', 4, 'null'],
+            ['none', 4, 'null'],
+        ];
+    }
+
+    /**
+     * Try to match a boolean or null keyword at the given position without regex.
+     *
+     * Uses substr_compare to avoid creating a substring and bypasses the regex
+     * engine entirely. Checks a word boundary after the match.
+     *
+     * @param int $length Pre-computed strlen($json)
+     *
+     * @return array{string, int}|null [normalized_value, keyword_length] or null
+     */
+    private function tryMatchKeyword(string $json, int $i, int $length): ?array
+    {
+        $c = $json[$i];
+
+        // Quick first-char gate before doing heavier work
+        if (! in_array($c, ['t', 'T', 'f', 'F', 'n', 'N'], true)) {
+            return null;
+        }
+
+        foreach (self::keywordMatchSpecs() as [$keyword, $klen, $normalized]) {
+            if ($length - $i >= $klen && substr_compare($json, $keyword, $i, $klen, true) === 0) {
+                $afterPos = $i + $klen;
+
+                // Word boundary: next char must not be alphanumeric or underscore
+                if ($afterPos >= $length || (! ctype_alnum($json[$afterPos]) && $json[$afterPos] !== '_')) {
+                    return [$normalized, $klen];
+                }
+            }
+        }
+
+        return null;
     }
 }

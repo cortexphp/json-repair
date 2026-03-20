@@ -6,3 +6,4 @@ composer.lock
 .phpstan-cache
 coverage
 .idea
+.claude
