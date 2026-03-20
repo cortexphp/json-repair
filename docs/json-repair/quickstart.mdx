@@ -40,6 +40,23 @@ $data = $repairer->decode();
 // ['key' => 'value']
 ```
 
+## Error Handling
+
+`repair()` throws `JsonRepairException` if the input cannot be repaired into valid JSON:
+
+```php
+use Cortex\JsonRepair\JsonRepairer;
+use Cortex\JsonRepair\Exceptions\JsonRepairException;
+
+try {
+    $repaired = (new JsonRepairer($input))->repair();
+} catch (JsonRepairException $e) {
+    // input could not be repaired into valid JSON
+}
+```
+
+The helper functions `json_repair()` and `json_repair_decode()` propagate the same exception.
+
 ## Next Steps
 
 - See [Repair Examples](/json-repair/repair-examples) for what gets fixed
