@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cortex\JsonRepair\Concerns;
 
+use Cortex\JsonRepair\ParserState;
+
 /**
  * @mixin \Cortex\JsonRepair\JsonRepairer
  */
@@ -71,7 +73,7 @@ trait StateMachine
             $this->output .= '{';
             $this->stack[] = '}';
             $this->pushObjectKeyScope();
-            $this->state = self::STATE_IN_OBJECT_KEY;
+            $this->state = ParserState::STATE_IN_OBJECT_KEY;
 
             if ($resetKeyTracking) {
                 $this->currentKeyStart = -1;
@@ -83,7 +85,7 @@ trait StateMachine
         if ($char === '[') {
             $this->output .= '[';
             $this->stack[] = ']';
-            $this->state = self::STATE_IN_ARRAY;
+            $this->state = ParserState::STATE_IN_ARRAY;
 
             if ($resetKeyTracking) {
                 $this->currentKeyStart = -1;
@@ -132,7 +134,7 @@ trait StateMachine
                 array_pop($this->objectKeysStack);
             }
 
-            $this->state = $this->stack === [] ? self::STATE_START : self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = $this->stack === [] ? ParserState::STATE_START : ParserState::STATE_EXPECTING_COMMA_OR_END;
 
             return $i + 1;
         }
@@ -175,7 +177,7 @@ trait StateMachine
                     }
 
                     $this->output .= '"';
-                    $this->state = self::STATE_EXPECTING_COLON;
+                    $this->state = ParserState::STATE_EXPECTING_COLON;
 
                     // Skip past the closing "" if present
                     if ($keyEnd + 1 < $length && ($json[$keyEnd] === '"' || $json[$keyEnd] === "'") && $json[$keyEnd + 1] === $json[$keyEnd]) {
@@ -200,8 +202,8 @@ trait StateMachine
             $this->output .= '"';
             $this->inString = true;
             $this->stringDelimiter = $char;
-            $this->stateBeforeString = self::STATE_IN_OBJECT_KEY;
-            $this->state = self::STATE_IN_STRING;
+            $this->stateBeforeString = ParserState::STATE_IN_OBJECT_KEY;
+            $this->state = ParserState::STATE_IN_STRING;
 
             return $i + 1;
         }
@@ -215,8 +217,8 @@ trait StateMachine
             $this->output .= '"';
             $this->inString = true;
             $this->stringDelimiter = '"'; // Normalize to regular quote
-            $this->stateBeforeString = self::STATE_IN_OBJECT_KEY;
-            $this->state = self::STATE_IN_STRING;
+            $this->stateBeforeString = ParserState::STATE_IN_OBJECT_KEY;
+            $this->state = ParserState::STATE_IN_STRING;
 
             return $i + $smartQuoteLength;
         }
@@ -233,7 +235,7 @@ trait StateMachine
 
             $this->output .= substr($json, $keyStart, $i - $keyStart);
             $this->output .= '"';
-            $this->state = self::STATE_EXPECTING_COLON;
+            $this->state = ParserState::STATE_EXPECTING_COLON;
 
             return $i;
         }
@@ -259,13 +261,13 @@ trait StateMachine
 
         if ($char === ':') {
             if ($this->handleDuplicateKey($this->extractCompletedKeyName())) {
-                $this->state = self::STATE_IN_OBJECT_VALUE;
+                $this->state = ParserState::STATE_IN_OBJECT_VALUE;
 
                 return $this->skipValueAt($json, $i + 1);
             }
 
             $this->output .= ':';
-            $this->state = self::STATE_IN_OBJECT_VALUE;
+            $this->state = ParserState::STATE_IN_OBJECT_VALUE;
 
             // Preserve whitespace after colon
             $nextI = $i + 1;
@@ -280,14 +282,14 @@ trait StateMachine
         // Missing colon, insert it
         if (! ctype_space($char)) {
             if ($this->handleDuplicateKey($this->extractCompletedKeyName())) {
-                $this->state = self::STATE_IN_OBJECT_VALUE;
+                $this->state = ParserState::STATE_IN_OBJECT_VALUE;
 
                 return $this->skipValueAt($json, $i);
             }
 
             $this->log('Inserting missing colon after key');
             $this->output .= ':';
-            $this->state = self::STATE_IN_OBJECT_VALUE;
+            $this->state = ParserState::STATE_IN_OBJECT_VALUE;
 
             return $i;
         }
@@ -330,8 +332,8 @@ trait StateMachine
             $this->output .= '"';
             $this->inString = true;
             $this->stringDelimiter = $char;
-            $this->stateBeforeString = self::STATE_IN_OBJECT_VALUE;
-            $this->state = self::STATE_IN_STRING;
+            $this->stateBeforeString = ParserState::STATE_IN_OBJECT_VALUE;
+            $this->state = ParserState::STATE_IN_STRING;
 
             return $i + 1;
         }
@@ -358,7 +360,7 @@ trait StateMachine
                 array_pop($this->objectKeysStack);
             }
 
-            $this->state = $this->stack === [] ? self::STATE_START : self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = $this->stack === [] ? ParserState::STATE_START : ParserState::STATE_EXPECTING_COMMA_OR_END;
 
             return $i + 1;
         }
@@ -379,7 +381,7 @@ trait StateMachine
             }
 
             $this->output .= $normalized;
-            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
             // Reset key tracking after successfully completing a boolean/null value
             $this->currentKeyStart = -1;
 
@@ -388,7 +390,7 @@ trait StateMachine
 
         // Handle numbers
         if (ctype_digit($char) || $char === '-' || $char === '+' || $char === '.') {
-            $this->state = self::STATE_IN_NUMBER;
+            $this->state = ParserState::STATE_IN_NUMBER;
 
             return $i;
         }
@@ -403,7 +405,7 @@ trait StateMachine
                 $this->output .= '""';
             }
 
-            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
 
             return $i;
         }
@@ -415,8 +417,8 @@ trait StateMachine
             $this->output .= '"';
             $this->inString = true;
             $this->stringDelimiter = '"';
-            $this->stateBeforeString = self::STATE_IN_OBJECT_VALUE;
-            $this->state = self::STATE_IN_STRING;
+            $this->stateBeforeString = ParserState::STATE_IN_OBJECT_VALUE;
+            $this->state = ParserState::STATE_IN_STRING;
 
             return $i + $smartQuoteLength;
         }
@@ -451,7 +453,7 @@ trait StateMachine
             $this->removeTrailingComma();
             $this->output .= ']';
             array_pop($this->stack);
-            $this->state = $this->stack === [] ? self::STATE_START : self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = $this->stack === [] ? ParserState::STATE_START : ParserState::STATE_EXPECTING_COMMA_OR_END;
 
             return $i + 1;
         }
@@ -466,8 +468,8 @@ trait StateMachine
             $this->output .= '"';
             $this->inString = true;
             $this->stringDelimiter = $char;
-            $this->stateBeforeString = self::STATE_IN_ARRAY;
-            $this->state = self::STATE_IN_STRING;
+            $this->stateBeforeString = ParserState::STATE_IN_ARRAY;
+            $this->state = ParserState::STATE_IN_STRING;
 
             return $i + 1;
         }
@@ -479,14 +481,14 @@ trait StateMachine
             $normalized = $keywordMatch[0];
             $klen = $keywordMatch[1];
             $this->output .= $normalized;
-            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
 
             return $i + $klen;
         }
 
         // Handle numbers
         if (ctype_digit($char) || $char === '-' || $char === '+' || $char === '.') {
-            $this->state = self::STATE_IN_NUMBER;
+            $this->state = ParserState::STATE_IN_NUMBER;
 
             return $i;
         }
@@ -519,14 +521,14 @@ trait StateMachine
                 array_pop($this->objectKeysStack);
             }
 
-            $this->state = $this->stack === [] ? self::STATE_START : self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = $this->stack === [] ? ParserState::STATE_START : ParserState::STATE_EXPECTING_COMMA_OR_END;
 
             return $i + 1;
         }
 
         if ($char === ',') {
             $this->output .= ',';
-            $this->state = $top === '}' ? self::STATE_IN_OBJECT_KEY : self::STATE_IN_ARRAY;
+            $this->state = $top === '}' ? ParserState::STATE_IN_OBJECT_KEY : ParserState::STATE_IN_ARRAY;
 
             // Preserve whitespace after comma
             $nextI = $i + 1;
@@ -543,7 +545,7 @@ trait StateMachine
         if (! ctype_space($char) && $char !== $top) {
             $this->log('Inserting missing comma');
             $this->output .= ',';
-            $this->state = $top === '}' ? self::STATE_IN_OBJECT_KEY : self::STATE_IN_ARRAY;
+            $this->state = $top === '}' ? ParserState::STATE_IN_OBJECT_KEY : ParserState::STATE_IN_ARRAY;
 
             return $i;
         }
@@ -644,7 +646,7 @@ trait StateMachine
             }
         }
 
-        $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+        $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
         $this->currentKeyStart = -1;
 
         return $i;
@@ -681,11 +683,11 @@ trait StateMachine
      */
     private function getNextStateAfterString(): int
     {
-        if ($this->stateBeforeString === self::STATE_IN_OBJECT_KEY) {
-            return self::STATE_EXPECTING_COLON;
+        if ($this->stateBeforeString === ParserState::STATE_IN_OBJECT_KEY) {
+            return ParserState::STATE_EXPECTING_COLON;
         }
 
-        return self::STATE_EXPECTING_COMMA_OR_END;
+        return ParserState::STATE_EXPECTING_COMMA_OR_END;
     }
 
     /**
@@ -794,7 +796,7 @@ trait StateMachine
                     $this->output .= '""';
                 }
 
-                $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+                $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
                 $this->currentKeyStart = -1;
 
                 return $i;
@@ -810,7 +812,7 @@ trait StateMachine
             $this->currentKeyStart = -1;
             // Insert a comma before the new key and set state to expect the key
             $this->output .= ', ';
-            $this->state = self::STATE_IN_OBJECT_KEY;
+            $this->state = ParserState::STATE_IN_OBJECT_KEY;
 
             return $i;
         }
@@ -818,7 +820,7 @@ trait StateMachine
         // Output the unquoted value as a quoted string
         if ($value !== '') {
             $this->output .= '"' . $this->escapeStringValue($value) . '"';
-            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
             $this->currentKeyStart = -1;
         }
 

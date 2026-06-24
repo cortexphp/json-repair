@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cortex\JsonRepair\Concerns;
 
+use Cortex\JsonRepair\ParserState;
+
 /**
  * @mixin \Cortex\JsonRepair\JsonRepairer
  */
@@ -62,7 +64,7 @@ trait StringHeuristics
     {
         // Only apply quote escaping logic for object values, not arrays
         // In arrays, quotes typically delimit separate values
-        if ($this->stateBeforeString === self::STATE_IN_ARRAY) {
+        if ($this->stateBeforeString === ParserState::STATE_IN_ARRAY) {
             return false;
         }
 

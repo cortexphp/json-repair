@@ -23,25 +23,7 @@ class JsonRepairer implements LoggerAwareInterface
     use InputSanitization;
     use OutputTracking;
 
-    private const int STATE_START = 0;
-
-    private const int STATE_IN_STRING = 1;
-
-    private const int STATE_IN_STRING_ESCAPE = 2;
-
-    private const int STATE_IN_NUMBER = 3;
-
-    private const int STATE_IN_OBJECT_KEY = 4;
-
-    private const int STATE_IN_OBJECT_VALUE = 5;
-
-    private const int STATE_IN_ARRAY = 6;
-
-    private const int STATE_EXPECTING_COLON = 7;
-
-    private const int STATE_EXPECTING_COMMA_OR_END = 8;
-
-    private int $state = self::STATE_START;
+    private int $state = ParserState::STATE_START;
 
     private int $pos = 0;
 
@@ -56,7 +38,7 @@ class JsonRepairer implements LoggerAwareInterface
 
     private string $stringDelimiter = '';
 
-    private int $stateBeforeString = self::STATE_START;
+    private int $stateBeforeString = ParserState::STATE_START;
 
     private int $currentKeyStart = -1;
 
@@ -175,13 +157,13 @@ class JsonRepairer implements LoggerAwareInterface
             $json = $this->extractFirstValidJson($json);
         }
 
-        $this->state = self::STATE_START;
+        $this->state = ParserState::STATE_START;
         $this->pos = 0;
         $this->output = '';
         $this->stack = [];
         $this->inString = false;
         $this->stringDelimiter = '';
-        $this->stateBeforeString = self::STATE_START;
+        $this->stateBeforeString = ParserState::STATE_START;
         $this->currentKeyStart = -1;
         $this->objectKeysStack = [];
         $this->skipNextValue = false;
@@ -194,19 +176,19 @@ class JsonRepairer implements LoggerAwareInterface
             $char = $json[$i];
             $this->pos = $i;
 
-            if ($this->state === self::STATE_IN_STRING_ESCAPE) {
+            if ($this->state === ParserState::STATE_IN_STRING_ESCAPE) {
                 if ($i >= strlen($json)) {
-                    $this->state = self::STATE_IN_STRING;
+                    $this->state = ParserState::STATE_IN_STRING;
                     break;
                 }
 
                 $extraCharsConsumed = $this->handleEscapeSequence($char, $json);
-                $this->state = self::STATE_IN_STRING;
+                $this->state = ParserState::STATE_IN_STRING;
                 $i += 1 + $extraCharsConsumed;
                 continue;
             }
 
-            if ($this->state === self::STATE_IN_STRING) {
+            if ($this->state === ParserState::STATE_IN_STRING) {
                 $smartQuoteLength = $char === "\xE2" ? $this->getSmartQuoteLength($json, $i) : 0;
 
                 if ($char === '"' && $this->stringDelimiter === "'") {
@@ -218,8 +200,8 @@ class JsonRepairer implements LoggerAwareInterface
 
                 if ($char === $this->stringDelimiter || $smartQuoteLength > 0) {
                     $isRegularQuote = $smartQuoteLength === 0;
-                    $isInValue = $this->stateBeforeString === self::STATE_IN_OBJECT_VALUE
-                        || $this->stateBeforeString === self::STATE_IN_ARRAY;
+                    $isInValue = $this->stateBeforeString === ParserState::STATE_IN_OBJECT_VALUE
+                        || $this->stateBeforeString === ParserState::STATE_IN_ARRAY;
 
                     if ($isRegularQuote && $isInValue && $this->shouldEscapeQuoteInValue($json, $i)) {
                         $this->log('Escaping embedded quote inside string value');
@@ -233,7 +215,7 @@ class JsonRepairer implements LoggerAwareInterface
                     $this->stringDelimiter = '';
                     $this->state = $this->getNextStateAfterString();
 
-                    if ($this->state === self::STATE_EXPECTING_COMMA_OR_END) {
+                    if ($this->state === ParserState::STATE_EXPECTING_COMMA_OR_END) {
                         $this->currentKeyStart = -1;
                     }
 
@@ -242,7 +224,7 @@ class JsonRepairer implements LoggerAwareInterface
                 }
 
                 if ($char === '\\') {
-                    $this->state = self::STATE_IN_STRING_ESCAPE;
+                    $this->state = ParserState::STATE_IN_STRING_ESCAPE;
                     $i++;
                     continue;
                 }
@@ -256,7 +238,7 @@ class JsonRepairer implements LoggerAwareInterface
                     $this->stringDelimiter = '';
                     $this->state = $this->getNextStateAfterString();
 
-                    if ($this->state === self::STATE_EXPECTING_COMMA_OR_END) {
+                    if ($this->state === ParserState::STATE_EXPECTING_COMMA_OR_END) {
                         $this->currentKeyStart = -1;
                     }
 
@@ -282,30 +264,30 @@ class JsonRepairer implements LoggerAwareInterface
                 continue;
             }
 
-            if ($this->skipNextValue && ($this->state === self::STATE_IN_OBJECT_VALUE || $this->state === self::STATE_IN_NUMBER)) {
+            if ($this->skipNextValue && ($this->state === ParserState::STATE_IN_OBJECT_VALUE || $this->state === ParserState::STATE_IN_NUMBER)) {
                 $i = $this->skipValueAt($json, $i);
                 $this->skipNextValue = false;
-                $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+                $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
                 continue;
             }
 
             $i = match ($this->state) {
-                self::STATE_START => $this->handleStart($json, $i),
-                self::STATE_IN_OBJECT_KEY => $this->handleObjectKey($json, $i),
-                self::STATE_EXPECTING_COLON => $this->handleExpectingColon($json, $i),
-                self::STATE_IN_OBJECT_VALUE => $this->handleObjectValue($json, $i),
-                self::STATE_IN_ARRAY => $this->handleArrayValue($json, $i),
-                self::STATE_EXPECTING_COMMA_OR_END => $this->handleExpectingCommaOrEnd($json, $i),
-                self::STATE_IN_NUMBER => $this->handleNumber($json, $i),
+                ParserState::STATE_START => $this->handleStart($json, $i),
+                ParserState::STATE_IN_OBJECT_KEY => $this->handleObjectKey($json, $i),
+                ParserState::STATE_EXPECTING_COLON => $this->handleExpectingColon($json, $i),
+                ParserState::STATE_IN_OBJECT_VALUE => $this->handleObjectValue($json, $i),
+                ParserState::STATE_IN_ARRAY => $this->handleArrayValue($json, $i),
+                ParserState::STATE_EXPECTING_COMMA_OR_END => $this->handleExpectingCommaOrEnd($json, $i),
+                ParserState::STATE_IN_NUMBER => $this->handleNumber($json, $i),
                 default => $i + 1,
             };
         }
 
         if ($this->inString) {
-            if ($this->omitIncompleteStrings && $this->stateBeforeString === self::STATE_IN_OBJECT_VALUE) {
+            if ($this->omitIncompleteStrings && $this->stateBeforeString === ParserState::STATE_IN_OBJECT_VALUE) {
                 $this->log('Removing incomplete string value (omitIncompleteStrings enabled)');
                 $this->removeCurrentKey();
-                $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+                $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
             } else {
                 $this->log('Adding missing closing quote for unclosed string');
                 $this->output .= '"';
@@ -315,7 +297,7 @@ class JsonRepairer implements LoggerAwareInterface
             $this->inString = false;
         }
 
-        if ($this->state === self::STATE_EXPECTING_COLON) {
+        if ($this->state === ParserState::STATE_EXPECTING_COLON) {
             if ($this->omitEmptyValues) {
                 $this->log('Removing key without value (omitEmptyValues enabled)');
                 $this->removeCurrentKey();
@@ -324,8 +306,8 @@ class JsonRepairer implements LoggerAwareInterface
                 $this->output .= ':""';
             }
 
-            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
-        } elseif ($this->state === self::STATE_IN_OBJECT_KEY) {
+            $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
+        } elseif ($this->state === ParserState::STATE_IN_OBJECT_KEY) {
             if (str_ends_with($this->output, '"') && ! str_ends_with($this->output, ':""')) {
                 if ($this->omitEmptyValues) {
                     $this->removeCurrentKey();
@@ -335,7 +317,7 @@ class JsonRepairer implements LoggerAwareInterface
             }
         }
 
-        if ($this->state === self::STATE_IN_OBJECT_VALUE && $this->outputEndsWithNonWhitespace(':')) {
+        if ($this->state === ParserState::STATE_IN_OBJECT_VALUE && $this->outputEndsWithNonWhitespace(':')) {
             $this->trimOutputTrailingWhitespace();
 
             if ($this->omitEmptyValues) {
@@ -344,7 +326,7 @@ class JsonRepairer implements LoggerAwareInterface
                 $this->output .= '""';
             }
 
-            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
         }
 
         while ($this->stack !== []) {
