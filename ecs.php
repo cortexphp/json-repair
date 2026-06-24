@@ -31,7 +31,6 @@ return ECSConfig::configure()
         psr12: true,
         common: true,
         cleanCode: true,
-        strict: true,
     )
     ->withPhpCsFixerSets(
         php83Migration: true,
