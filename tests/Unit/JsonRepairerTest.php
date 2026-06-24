@@ -6,6 +6,8 @@ namespace Cortex\JsonRepair\Tests\Unit;
 
 use Cortex\JsonRepair\JsonRepairer;
 use ColinODell\PsrTestLogger\TestLogger;
+use Cortex\JsonRepair\DuplicateKeyPolicy;
+use Cortex\JsonRepair\StreamingJsonRepairer;
 
 use function Cortex\JsonRepair\json_repair;
 use function Cortex\JsonRepair\json_repair_decode;
@@ -164,6 +166,13 @@ describe('Values and structures', function (): void {
         expect(json_decode($result, true)['key'])->toBe($expected);
     })->with('numbers');
 
+    it('repairs invalid numbers', function (string $input, string $expectedJson, int|float $expected): void {
+        $result = json_repair($input);
+        expect(json_validate($result))->toBeTrue();
+        expect($result)->toBe($expectedJson);
+        expect(json_decode($result, true)['key'])->toBe($expected);
+    })->with('invalid_numbers');
+
     it(
         'handles strings with special characters',
         function (string $input, string $expectedKey, string $expectedValue): void {
@@ -191,6 +200,15 @@ describe('Values and structures', function (): void {
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
     })->with('advanced_escaping');
+
+    it('escapes unicode characters when ensureAscii is true', function (): void {
+        $result = json_repair("{'city':'上海'}");
+        expect(json_validate($result))->toBeTrue();
+        expect($result)->toBe('{"city":"\\u4e0a\\u6d77"}');
+
+        $decoded = json_decode($result, true);
+        expect($decoded['city'])->toBe('上海');
+    });
 
     it('handles unicode characters when ensureAscii is false', function (): void {
         $input = "{'test_中国人_ascii':'统一码'}";
@@ -602,5 +620,102 @@ describe('Logging', function (): void {
 
         expect($logger->hasDebugRecords())->toBeTrue();
         expect($result)->toBe('{"key": "value"}');
+    });
+});
+
+describe('RepairResult', function (): void {
+    it('returns structured repair details', function (): void {
+        $repairer = new JsonRepairer("{'key': 'value'}");
+        $repairResult = $repairer->repairWithDetails();
+
+        expect($repairResult->wasAlreadyValid)->toBeFalse();
+        expect($repairResult->json)->toBe('{"key": "value"}');
+        expect($repairResult->fixes)->toContain('Starting JSON repair');
+    });
+
+    it('marks valid JSON as already valid', function (): void {
+        $repairResult = (new JsonRepairer('{"key": "value"}'))->repairWithDetails();
+
+        expect($repairResult->wasAlreadyValid)->toBeTrue();
+        expect($repairResult->json)->toBe('{"key": "value"}');
+        expect($repairResult->fixes)->toContain('JSON is already valid, returning as-is');
+    });
+});
+
+describe('repairAll', function (): void {
+    it('repairs multiple top-level JSON values', function (): void {
+        $repairer = new JsonRepairer('{"a":1}{"b":2}');
+        $results = $repairer->repairAll();
+
+        expect($results)->toHaveCount(2);
+        expect(json_decode($results[0], true))->toBe([
+            'a' => 1,
+        ]);
+        expect(json_decode($results[1], true))->toBe([
+            'b' => 2,
+        ]);
+    });
+
+    it('repairs NDJSON lines', function (): void {
+        $repairer = new JsonRepairer("{'a':1}\n{'b':2}");
+        $results = $repairer->repairAll();
+
+        expect($results)->toHaveCount(2);
+        expect(json_decode($results[0], true))->toBe([
+            'a' => 1,
+        ]);
+        expect(json_decode($results[1], true))->toBe([
+            'b' => 2,
+        ]);
+    });
+});
+
+describe('StreamingJsonRepairer', function (): void {
+    it('repairs incrementally fed chunks', function (): void {
+        $stream = new StreamingJsonRepairer();
+        $stream->feed('{"key": ');
+        $stream->feed('"val');
+
+        $result = $stream->current();
+
+        expect(json_validate($result))->toBeTrue();
+        expect(json_decode($result, true))->toBe([
+            'key' => 'val',
+        ]);
+    });
+});
+
+describe('Duplicate key policy', function (): void {
+    it('keeps first duplicate key when configured', function (): void {
+        $repairer = new JsonRepairer('{a: 1, a: 2}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepFirst);
+        $result = $repairer->repair();
+
+        expect(json_decode($result, true))->toBe([
+            'a' => 1,
+        ]);
+    });
+
+    it('keeps last duplicate key when configured', function (): void {
+        $repairer = new JsonRepairer('{a: 1, a: 2}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepLast);
+        $result = $repairer->repair();
+
+        expect(json_decode($result, true))->toBe([
+            'a' => 2,
+        ]);
+    });
+});
+
+describe('Scalar decode', function (): void {
+    it('decodes top-level scalar values', function (): void {
+        $repairer = new JsonRepairer('true');
+        expect($repairer->decode())->toBeTrue();
+    });
+
+    it('decodes top-level null via json_repair_decode', function (): void {
+        expect(json_repair_decode('null'))->toBeNull();
+    });
+
+    it('decodes top-level string scalars', function (): void {
+        expect((new JsonRepairer('"hello"'))->decode())->toBe('hello');
     });
 });

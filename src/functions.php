@@ -44,7 +44,7 @@ function json_repair(
  * @param bool $omitIncompleteStrings Whether to remove keys with incomplete string values instead of closing them (default: false)
  * @param \Psr\Log\LoggerInterface|null $logger Optional PSR-3 logger for debugging repair actions
  *
- * @return array<mixed>|object The decoded JSON data
+ * @return mixed The decoded JSON data
  */
 function json_repair_decode(
     string $json,
@@ -54,7 +54,7 @@ function json_repair_decode(
     bool $omitEmptyValues = false,
     bool $omitIncompleteStrings = false,
     ?LoggerInterface $logger = null,
-): array|object {
+): mixed {
     $repairer = new JsonRepairer($json, $ensureAscii, $omitEmptyValues, $omitIncompleteStrings);
 
     if ($logger instanceof LoggerInterface) {

@@ -443,6 +443,9 @@ dataset('booleans_and_null', [
     'JSON false' => ['{"key": false}', '{"key": false}'],
     'JSON null' => ['{"key": null}', '{"key": null}'],
     'array with capitalized booleans' => ['[True, False, None]', '[true, false, null]'],
+    'Infinity' => ['{"key": Infinity}', '{"key": null}'],
+    'negative Infinity' => ['{"key": -Infinity}', '{"key": null}'],
+    'NaN' => ['{"key": NaN}', '{"key": null}'],
 ]);
 
 dataset('standalone_booleans_null', [
@@ -460,6 +463,39 @@ dataset('numbers', [
     'decimal' => ['{"key": 123.456}', 123.456],
     'scientific notation' => ['{"key": 123e10}', 'validate_only'],
     'large integer' => ['{"key": 12345678901234567890}', 'validate_only'],
+]);
+
+dataset('invalid_numbers', [
+    'leading plus sign' => [
+        '{"key": +123}',
+        '{"key": 123}',
+        123,
+    ],
+    'leading zeros' => [
+        '{"key": 007}',
+        '{"key": 7}',
+        7,
+    ],
+    'bare decimal' => [
+        '{"key": .5}',
+        '{"key": 0.5}',
+        0.5,
+    ],
+    'trailing decimal point' => [
+        '{"key": 5.}',
+        '{"key": 5}',
+        5,
+    ],
+    'leading zeros with decimal' => [
+        '{"key": 007.5}',
+        '{"key": 7.5}',
+        7.5,
+    ],
+    'zero decimal preserved' => [
+        '{"key": 0.5}',
+        '{"key": 0.5}',
+        0.5,
+    ],
 ]);
 
 dataset('empty_strings', [

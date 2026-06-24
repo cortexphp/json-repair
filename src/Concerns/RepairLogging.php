@@ -10,17 +10,42 @@ namespace Cortex\JsonRepair\Concerns;
 trait RepairLogging
 {
     /**
-     * Log a repair action with context.
-     *
+     * @var list<string>
+     */
+    private array $collectedFixes = [];
+
+    private bool $collectFixes = false;
+
+    /**
      * @param string $message Description of the repair action
      * @param array<string, mixed> $context Additional context data
      */
     private function log(string $message, array $context = []): void
     {
+        if ($this->collectFixes) {
+            $this->collectedFixes[] = $message;
+        }
+
         $this->logger?->debug($message, array_merge([
             'position' => $this->pos,
             'context' => $this->getContextSnippet(),
         ], $context));
+    }
+
+    private function beginFixCollection(): void
+    {
+        $this->collectFixes = true;
+        $this->collectedFixes = [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function endFixCollection(): array
+    {
+        $this->collectFixes = false;
+
+        return $this->collectedFixes;
     }
 
     /**

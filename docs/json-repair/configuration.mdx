@@ -64,6 +64,21 @@ json_repair('{"complete": "value", "incomplete": "partial', omitIncompleteString
 // {"complete": "value"}
 ```
 
+## duplicateKeyPolicy
+
+When repairing malformed JSON that repeats the same object key, choose which value to keep. Pass `null` (default) to leave duplicate keys as-is in the repaired string.
+
+```php
+use Cortex\JsonRepair\DuplicateKeyPolicy;
+use Cortex\JsonRepair\JsonRepairer;
+
+// keep-first: {"a": 1}
+new JsonRepairer('{a: 1, a: 2}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepFirst)->repair();
+
+// keep-last: {"a": 2}
+new JsonRepairer('{a: 1, a: 2}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepLast)->repair();
+```
+
 ## Combined Options
 
 Use both options together for streaming LLM output:
@@ -92,3 +107,58 @@ $repairer = new JsonRepairer(
 $repaired = $repairer->repair();
 // {"key1": "v1"}
 ```
+
+## Advanced APIs
+
+### Structured repair report
+
+`repairWithDetails()` returns a `RepairResult` with the repaired JSON, whether input was already valid, and a list of fixes applied (same messages as debug logging):
+
+```php
+use Cortex\JsonRepair\JsonRepairer;
+
+$result = (new JsonRepairer("{'key': 'value'}"))->repairWithDetails();
+// $result->json, $result->wasAlreadyValid, $result->fixes
+```
+
+### Multiple values / NDJSON
+
+`repairAll()` repairs each top-level JSON value separately:
+
+```php
+$results = (new JsonRepairer("{'a':1}\n{'b':2}"))->repairAll();
+// ['{"a": 1}', '{"b": 2}']
+```
+
+### Streaming repair
+
+`StreamingJsonRepairer` accumulates chunks and returns the best-effort repair so far:
+
+```php
+use Cortex\JsonRepair\StreamingJsonRepairer;
+
+$stream = new StreamingJsonRepairer();
+$stream->feed('{"name": "');
+$partial = $stream->current(); // closes incomplete string/braces
+```
+
+### Scalar decode
+
+`decode()` returns `mixed` — top-level scalars (strings, numbers, booleans, null) decode directly without being cast to arrays:
+
+```php
+(new JsonRepairer('true'))->decode(); // true
+json_repair_decode('null');          // null
+```
+
+## Invalid numbers and non-finite values
+
+The repairer normalizes common invalid numeric literals:
+
+| Input | Repaired |
+|-------|----------|
+| `+123` | `123` |
+| `007` | `7` |
+| `.5` | `0.5` |
+| `5.` | `5` |
+| `Infinity`, `-Infinity`, `NaN` | `null` |
