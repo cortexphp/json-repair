@@ -13,6 +13,7 @@ use Psr\Log\LoggerInterface;
  * @param bool $ensureAscii Whether to escape non-ASCII characters (default: true)
  * @param bool $omitEmptyValues Whether to remove keys with missing values instead of adding empty strings (default: false)
  * @param bool $omitIncompleteStrings Whether to remove keys with incomplete string values instead of closing them (default: false)
+ * @param \Cortex\JsonRepair\DuplicateKeyPolicy|null $duplicateKeyPolicy How to handle duplicate object keys (default: null — no deduplication)
  * @param \Psr\Log\LoggerInterface|null $logger Optional PSR-3 logger for debugging repair actions
  *
  * @return string The repaired JSON string
@@ -22,9 +23,10 @@ function json_repair(
     bool $ensureAscii = true,
     bool $omitEmptyValues = false,
     bool $omitIncompleteStrings = false,
+    ?DuplicateKeyPolicy $duplicateKeyPolicy = null,
     ?LoggerInterface $logger = null,
 ): string {
-    $repairer = new JsonRepairer($json, $ensureAscii, $omitEmptyValues, $omitIncompleteStrings);
+    $repairer = new JsonRepairer($json, $ensureAscii, $omitEmptyValues, $omitIncompleteStrings, $duplicateKeyPolicy);
 
     if ($logger instanceof LoggerInterface) {
         $repairer->setLogger($logger);
@@ -42,6 +44,7 @@ function json_repair(
  * @param bool $ensureAscii Whether to escape non-ASCII characters (default: true)
  * @param bool $omitEmptyValues Whether to remove keys with missing values instead of adding empty strings (default: false)
  * @param bool $omitIncompleteStrings Whether to remove keys with incomplete string values instead of closing them (default: false)
+ * @param \Cortex\JsonRepair\DuplicateKeyPolicy|null $duplicateKeyPolicy How to handle duplicate object keys (default: null — no deduplication)
  * @param \Psr\Log\LoggerInterface|null $logger Optional PSR-3 logger for debugging repair actions
  *
  * @return mixed The decoded JSON data
@@ -53,9 +56,10 @@ function json_repair_decode(
     bool $ensureAscii = true,
     bool $omitEmptyValues = false,
     bool $omitIncompleteStrings = false,
+    ?DuplicateKeyPolicy $duplicateKeyPolicy = null,
     ?LoggerInterface $logger = null,
 ): mixed {
-    $repairer = new JsonRepairer($json, $ensureAscii, $omitEmptyValues, $omitIncompleteStrings);
+    $repairer = new JsonRepairer($json, $ensureAscii, $omitEmptyValues, $omitIncompleteStrings, $duplicateKeyPolicy);
 
     if ($logger instanceof LoggerInterface) {
         $repairer->setLogger($logger);
