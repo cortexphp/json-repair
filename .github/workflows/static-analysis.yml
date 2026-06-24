@@ -22,7 +22,7 @@ jobs:
         uses: ./.github/actions/setup-php-composer
 
       - name: Cache phpstan results
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .phpstan-cache
           key: "result-cache-${{ github.run_id }}" # always write a new cache
@@ -54,7 +54,7 @@ jobs:
         uses: ./.github/actions/setup-php-composer
 
       - name: Cache rector results
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /tmp/rector
           key: "rector-cache-${{ github.run_id }}" # always write a new cache
@@ -62,7 +62,7 @@ jobs:
             rector-cache-
 
       - name: Cache ecs results
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /tmp/ecs
           key: "ecs-cache-${{ github.run_id }}" # always write a new cache
