@@ -328,6 +328,10 @@ dataset('leading_trailing_characters', [
                        ```',
         '{"key": "value"}',
     ],
+    'surrounding text without backticks' => [
+        'Here is the JSON: { "foo": "bar" } The next 64 elements are:',
+        '{"foo": "bar"}',
+    ],
 ]);
 
 dataset('json_in_strings', [
