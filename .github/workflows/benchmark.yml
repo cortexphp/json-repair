@@ -2,6 +2,7 @@ name: Benchmarks
 
 permissions:
   contents: read
+  pull-requests: write
 
 on:
   pull_request:
@@ -35,11 +36,73 @@ jobs:
           vendor/bin/phpbench run --tag=base --progress=none
 
       - name: Compare PR against baseline
+        id: compare
         run: |
           git checkout ${{ github.event.pull_request.head.sha }}
           composer install --prefer-dist --no-interaction --no-progress
+          set +e
           vendor/bin/phpbench run \
             --ref=base \
             --report=aggregate \
             --progress=none \
-            --assert="mode(variant.time.avg) <= mode(baseline.time.avg) +/- 15%"
+            --no-ansi \
+            --assert="mode(variant.time.avg) <= mode(baseline.time.avg) +/- 15%" \
+            > benchmark-report.txt 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat benchmark-report.txt
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Benchmark results"
+            echo
+            echo '```'
+            cat benchmark-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment results on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('benchmark-report.txt', 'utf8');
+            const passed = '${{ steps.compare.outputs.exit_code }}' === '0';
+            const status = passed
+              ? 'No performance regression detected (within 15% tolerance).'
+              : 'Possible performance regression detected (exceeds 15% tolerance).';
+            const marker = '<!-- phpbench-regression -->';
+            const body = [
+              marker,
+              '## Benchmark results',
+              '',
+              status,
+              '',
+              '<details>',
+              '<summary>Aggregate report vs. base</summary>',
+              '',
+              '```',
+              report,
+              '```',
+              '',
+              '</details>',
+              '',
+              `_Compared against base \`${context.payload.pull_request.base.sha.slice(0, 7)}\`._`,
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Fail on regression
+        if: always() && steps.compare.outputs.exit_code != '0'
+        run: |
+          echo "Benchmark regression exceeded the configured tolerance."
+          exit 1
