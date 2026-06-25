@@ -69,6 +69,31 @@ describe('Values and structures', function (): void {
     });
 
     it(
+        'drops an incomplete exponent without removing the whole number',
+        function (string $input, int|float $expected): void {
+            $result = json_repair($input);
+            expect(json_validate($result))->toBeTrue();
+            expect(json_decode($result, true)['key'])->toBe($expected);
+        },
+    )->with([
+        'plus exponent no digits' => ['{"key": 1e+}', 1],
+        'minus exponent no digits' => ['{"key": 12e-}', 12],
+        'bare exponent no digits' => ['{"key": 1e}', 1],
+        'plus exponent after decimal' => ['{"key": 1.5e+}', 1.5],
+    ]);
+
+    it('drops an incomplete exponent inside an array', function (): void {
+        $result = json_repair('[1e+]');
+        expect(json_validate($result))->toBeTrue();
+        expect(json_decode($result, true))->toBe([1]);
+    });
+
+    it('preserves complete signed exponents', function (): void {
+        expect(json_decode(json_repair('{"key": 1e+5}'), true)['key'])->toBe(100000.0);
+        expect(json_decode(json_repair('{"key": 1.5e-3}'), true)['key'])->toBe(0.0015);
+    });
+
+    it(
         'handles strings with special characters',
         function (string $input, string $expectedKey, string $expectedValue): void {
             $result = json_repair($input);

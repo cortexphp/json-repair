@@ -386,25 +386,6 @@ class JsonRepairer implements LoggerAwareInterface
             }
         }
 
-        if ($this->duplicateKeyPolicy === DuplicateKeyPolicy::KeepLast && $this->output !== '') {
-            $decoded = json_decode($this->output, true);
-
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $flags = JSON_UNESCAPED_SLASHES;
-
-                if (! $this->ensureAscii) {
-                    $flags |= JSON_UNESCAPED_UNICODE;
-                }
-
-                $encoded = json_encode($decoded, $flags);
-
-                if ($encoded !== false) {
-                    $this->output = $encoded;
-                    $encodedViaRoundTrip = true;
-                }
-            }
-        }
-
         if (! $encodedViaRoundTrip && $this->output !== '' && ! json_validate($this->output)) {
             throw JsonRepairException::invalidJsonAfterRepair($this->output);
         }
@@ -441,15 +422,49 @@ class JsonRepairer implements LoggerAwareInterface
             return true;
         }
 
-        // Keep-last is resolved during finalization: the duplicate value is emitted
-        // normally and json_decode() retains the final occurrence. Surgically removing
-        // the earlier occurrence here would also delete any intervening keys.
-        $this->log('Keeping last duplicate key (keep-last policy)', [
+        $this->log('Replacing duplicate key (keep-last policy)', [
             'key' => $keyName,
         ]);
-        $this->objectKeysStack[$depth][$keyName] = $this->currentKeyStart;
+        $this->removePreviousKeyOccurrence($depth, $keyName);
 
         return false;
+    }
+
+    /**
+     * Remove the earlier occurrence of a duplicate key (keep-last policy) from
+     * the output, preserving every other key/value verbatim.
+     *
+     * Only the region from the previous key up to the *immediately following*
+     * key is removed (its value plus the trailing separator), so intervening
+     * keys are kept. Tracked output offsets are shifted to account for the
+     * removed span. This operates on the output string directly to avoid a
+     * json_decode()/json_encode() round-trip, which would reformat output and
+     * corrupt numbers that exceed PHP's native precision.
+     */
+    private function removePreviousKeyOccurrence(int $depth, string $keyName): void
+    {
+        $previousStart = $this->objectKeysStack[$depth][$keyName];
+        $nextStart = $this->currentKeyStart;
+
+        foreach ($this->objectKeysStack[$depth] as $offset) {
+            if ($offset > $previousStart && $offset < $nextStart) {
+                $nextStart = $offset;
+            }
+        }
+
+        $removedLength = $nextStart - $previousStart;
+        $this->setOutput(substr($this->output, 0, $previousStart) . substr($this->output, $nextStart));
+
+        unset($this->objectKeysStack[$depth][$keyName]);
+
+        foreach ($this->objectKeysStack[$depth] as $name => $offset) {
+            if ($offset >= $nextStart) {
+                $this->objectKeysStack[$depth][$name] = $offset - $removedLength;
+            }
+        }
+
+        $this->currentKeyStart -= $removedLength;
+        $this->objectKeysStack[$depth][$keyName] = $this->currentKeyStart;
     }
 
     private function extractCompletedKeyName(): string

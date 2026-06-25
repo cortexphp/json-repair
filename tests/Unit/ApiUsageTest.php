@@ -155,9 +155,47 @@ describe('Duplicate key policy', function (): void {
 
         expect(json_validate($result))->toBeTrue();
         expect(json_decode($result, true))->toBe([
-            'a' => 3,
             'b' => 2,
+            'a' => 3,
         ]);
+    });
+
+    it('keeps last across multiple non-adjacent duplicates', function (): void {
+        $repairer = new JsonRepairer('{a: 1, b: 2, a: 3, b: 4}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepLast);
+        $result = $repairer->repair();
+
+        expect(json_validate($result))->toBeTrue();
+        expect(json_decode($result, true))->toBe([
+            'a' => 3,
+            'b' => 4,
+        ]);
+    });
+
+    it('does not corrupt large integers when keep-last is enabled', function (): void {
+        $repairer = new JsonRepairer(
+            '{big: 12345678901234567890, a: 1}',
+            duplicateKeyPolicy: DuplicateKeyPolicy::KeepLast,
+        );
+        $result = $repairer->repair();
+
+        expect(json_validate($result))->toBeTrue();
+        expect($result)->toContain('12345678901234567890');
+        expect($result)->not->toContain('e+');
+    });
+
+    it('preserves large integers while still deduplicating with keep-last', function (): void {
+        $repairer = new JsonRepairer(
+            '{big: 12345678901234567890, a: 1, a: 2}',
+            duplicateKeyPolicy: DuplicateKeyPolicy::KeepLast,
+        );
+        $result = $repairer->repair();
+
+        expect(json_validate($result))->toBeTrue();
+        expect($result)->toContain('12345678901234567890');
+        expect($result)->not->toContain('e+');
+
+        $decoded = json_decode($result, true);
+        expect($decoded['a'])->toBe(2);
     });
 
     it('keeps first when skipped duplicate value is a structure containing brackets in strings', function (): void {

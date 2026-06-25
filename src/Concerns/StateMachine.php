@@ -645,7 +645,7 @@ trait StateMachine
         }
 
         if ($i < $length && ($json[$i] === 'e' || $json[$i] === 'E')) {
-            $exponentStart = $i;
+            $outputLengthBeforeExponent = strlen($this->output);
             $this->output .= $json[$i];
             $i++;
 
@@ -666,7 +666,7 @@ trait StateMachine
             if ($i > $digitStart) {
                 $this->output .= substr($json, $digitStart, $i - $digitStart);
             } else {
-                $this->truncateOutput(strlen($this->output) - ($digitStart - $exponentStart));
+                $this->truncateOutput($outputLengthBeforeExponent);
             }
         }
 
