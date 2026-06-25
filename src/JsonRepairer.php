@@ -66,25 +66,31 @@ class JsonRepairer implements LoggerAwareInterface
 
     public function repair(): string
     {
-        return $this->repairWithDetails()->json;
+        if (json_validate($this->json)) {
+            $this->log('JSON is already valid, returning as-is');
+
+            return $this->json;
+        }
+
+        $this->log('Starting JSON repair');
+
+        return $this->repairInternal(extractFirstOnly: true);
     }
 
     public function repairWithDetails(): RepairResult
     {
-        if (json_validate($this->json)) {
-            $this->beginFixCollection();
-            $this->log('JSON is already valid, returning as-is');
-            $fixes = $this->endFixCollection();
+        $this->beginFixCollection();
 
-            return new RepairResult($this->json, true, $fixes);
+        if (json_validate($this->json)) {
+            $this->log('JSON is already valid, returning as-is');
+
+            return new RepairResult($this->json, true, $this->endFixCollection());
         }
 
-        $this->beginFixCollection();
         $this->log('Starting JSON repair');
         $repaired = $this->repairInternal(extractFirstOnly: true);
-        $fixes = $this->endFixCollection();
 
-        return new RepairResult($repaired, false, $fixes);
+        return new RepairResult($repaired, false, $this->endFixCollection());
     }
 
     /**

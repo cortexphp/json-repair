@@ -23,12 +23,14 @@ trait OutputTracking
     {
         $length = strlen($this->output);
 
-        for ($j = $this->outputSyncedLength; $j < $length; $j++) {
-            $char = $this->output[$j];
+        if ($length === $this->outputSyncedLength) {
+            return;
+        }
 
-            if (! in_array($char, [' ', "\t", "\n", "\r", "\f", "\v"], true)) {
-                $this->lastNonWhitespaceChar = $char;
-            }
+        $trimmed = rtrim(substr($this->output, $this->outputSyncedLength), " \t\n\r\f\v");
+
+        if ($trimmed !== '') {
+            $this->lastNonWhitespaceChar = $trimmed[strlen($trimmed) - 1];
         }
 
         $this->outputSyncedLength = $length;
