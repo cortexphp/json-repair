@@ -1,0 +1,45 @@
+name: Benchmarks
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    name: Benchmark regression
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP and Composer
+        uses: ./.github/actions/setup-php-composer
+        with:
+          php-version: 8.3
+
+      # Store a baseline from the PR's base branch on this same runner, so the
+      # comparison is hardware-consistent (baselines are never committed).
+      - name: Store baseline from base branch
+        run: |
+          git checkout ${{ github.event.pull_request.base.sha }}
+          composer install --prefer-dist --no-interaction --no-progress
+          vendor/bin/phpbench run --tag=base --progress=none
+
+      - name: Compare PR against baseline
+        run: |
+          git checkout ${{ github.event.pull_request.head.sha }}
+          composer install --prefer-dist --no-interaction --no-progress
+          vendor/bin/phpbench run \
+            --ref=base \
+            --report=aggregate \
+            --progress=none \
+            --assert="mode(variant.time.avg) <= mode(baseline.time.avg) +/- 15%"

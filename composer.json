@@ -47,6 +47,8 @@
     "scripts": {
         "test": "pest",
         "benchmark": "phpbench run",
+        "benchmark:base": "phpbench run --tag=base --progress=none",
+        "benchmark:ci": "phpbench run --ref=base --report=aggregate --progress=none --assert=\"mode(variant.time.avg) <= mode(baseline.time.avg) +/- 15%\"",
         "ecs": "ecs check --fix",
         "rector": "rector process",
         "stan": "phpstan analyse",
