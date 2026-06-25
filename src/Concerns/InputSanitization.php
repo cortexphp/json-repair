@@ -410,7 +410,7 @@ trait InputSanitization
                 }
 
                 $depth++;
-            } elseif ($char === '}' || $char === ']') {
+            } elseif (($char === '}' || $char === ']') && $depth > 0) {
                 $depth--;
 
                 if ($depth === 0 && $start !== -1) {

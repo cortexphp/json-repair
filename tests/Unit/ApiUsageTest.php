@@ -104,6 +104,19 @@ describe('repairAll', function (): void {
             'b' => 2,
         ]);
     });
+
+    it('repairs top-level values despite leading stray closing brackets', function (): void {
+        $repairer = new JsonRepairer('}{"a":1}{"b":2}');
+        $results = $repairer->repairAll();
+
+        expect($results)->toHaveCount(2);
+        expect(json_decode($results[0], true))->toBe([
+            'a' => 1,
+        ]);
+        expect(json_decode($results[1], true))->toBe([
+            'b' => 2,
+        ]);
+    });
 });
 
 describe('Duplicate key policy', function (): void {
@@ -124,6 +137,59 @@ describe('Duplicate key policy', function (): void {
             'a' => 2,
         ]);
     });
+
+    it('keeps first non-adjacent duplicate key without dropping intervening keys', function (): void {
+        $repairer = new JsonRepairer('{a: 1, b: 2, a: 3}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepFirst);
+        $result = $repairer->repair();
+
+        expect(json_validate($result))->toBeTrue();
+        expect(json_decode($result, true))->toBe([
+            'a' => 1,
+            'b' => 2,
+        ]);
+    });
+
+    it('keeps last non-adjacent duplicate key without dropping intervening keys', function (): void {
+        $repairer = new JsonRepairer('{a: 1, b: 2, a: 3}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepLast);
+        $result = $repairer->repair();
+
+        expect(json_validate($result))->toBeTrue();
+        expect(json_decode($result, true))->toBe([
+            'a' => 3,
+            'b' => 2,
+        ]);
+    });
+
+    it('keeps first when skipped duplicate value is a structure containing brackets in strings', function (): void {
+        $repairer = new JsonRepairer(
+            '{a: 1, a: {b: [1, 2], c: "}}"}, z: 9}',
+            duplicateKeyPolicy: DuplicateKeyPolicy::KeepFirst,
+        );
+        $result = $repairer->repair();
+
+        expect(json_validate($result))->toBeTrue();
+        expect(json_decode($result, true))->toBe([
+            'a' => 1,
+            'z' => 9,
+        ]);
+    });
+
+    it(
+        'keeps first when skipped duplicate value is an array containing its closing bracket in a string',
+        function (): void {
+            $repairer = new JsonRepairer(
+                '{a: 1, a: ["]", 3], z: 9}',
+                duplicateKeyPolicy: DuplicateKeyPolicy::KeepFirst,
+            );
+            $result = $repairer->repair();
+
+            expect(json_validate($result))->toBeTrue();
+            expect(json_decode($result, true))->toBe([
+                'a' => 1,
+                'z' => 9,
+            ]);
+        },
+    );
 });
 
 describe('Scalar decode', function (): void {

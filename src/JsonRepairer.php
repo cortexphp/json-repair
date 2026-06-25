@@ -446,27 +446,15 @@ class JsonRepairer implements LoggerAwareInterface
             return true;
         }
 
-        $this->log('Replacing duplicate key (keep-last policy)', [
+        // Keep-last is resolved during finalization: the duplicate value is emitted
+        // normally and json_decode() retains the final occurrence. Surgically removing
+        // the earlier occurrence here would also delete any intervening keys.
+        $this->log('Keeping last duplicate key (keep-last policy)', [
             'key' => $keyName,
         ]);
-        $previousStart = $this->objectKeysStack[$depth][$keyName];
-        $this->removeKeyValueRegion($previousStart, $this->currentKeyStart);
         $this->objectKeysStack[$depth][$keyName] = $this->currentKeyStart;
 
         return false;
-    }
-
-    private function removeKeyValueRegion(int $keyStart, int $nextKeyStart): void
-    {
-        $before = substr($this->output, 0, $keyStart);
-        $before = rtrim($before);
-
-        if (str_ends_with($before, ',')) {
-            $before = rtrim(substr($before, 0, -1));
-        }
-
-        $after = substr($this->output, $nextKeyStart);
-        $this->setOutput($before . $after);
     }
 
     private function extractCompletedKeyName(): string
@@ -521,15 +509,42 @@ class JsonRepairer implements LoggerAwareInterface
         }
 
         if ($char === '{' || $char === '[') {
-            $close = $char === '{' ? '}' : ']';
-            $depth = 1;
-            $i++;
+            $depth = 0;
 
-            while ($i < $length && $depth > 0) {
-                if ($json[$i] === $char) {
+            while ($i < $length) {
+                $current = $json[$i];
+
+                if ($current === '"' || $current === "'") {
+                    $delimiter = $current;
+                    $i++;
+
+                    while ($i < $length) {
+                        if ($json[$i] === '\\') {
+                            $i += 2;
+
+                            continue;
+                        }
+
+                        if ($json[$i] === $delimiter) {
+                            $i++;
+
+                            break;
+                        }
+
+                        $i++;
+                    }
+
+                    continue;
+                }
+
+                if ($current === '{' || $current === '[') {
                     $depth++;
-                } elseif ($json[$i] === $close) {
+                } elseif ($current === '}' || $current === ']') {
                     $depth--;
+
+                    if ($depth === 0) {
+                        return $i + 1;
+                    }
                 }
 
                 $i++;
