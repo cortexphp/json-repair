@@ -380,7 +380,7 @@ trait StateMachine
         }
 
         // Handle numbers
-        if (ctype_digit($char) || $char === '-' || $char === '+' || $char === '.') {
+        if ($this->startsNumber($json, $i, $length)) {
             $this->state = ParserState::STATE_IN_NUMBER;
 
             return $i;
@@ -478,13 +478,46 @@ trait StateMachine
         }
 
         // Handle numbers
-        if (ctype_digit($char) || $char === '-' || $char === '+' || $char === '.') {
+        if ($this->startsNumber($json, $i, $length)) {
             $this->state = ParserState::STATE_IN_NUMBER;
 
             return $i;
         }
 
         return $i + 1;
+    }
+
+    /**
+     * Determine whether the character at $i begins a valid JSON number.
+     *
+     * A digit always starts a number. A sign (`-`/`+`) or a leading dot only
+     * starts a number when at least one digit follows (directly or after a dot),
+     * so malformed values like `.`, `-.`, or `+` are not treated as numbers
+     * (which would otherwise emit invalid output such as `0.`).
+     */
+    private function startsNumber(string $json, int $i, int $length): bool
+    {
+        $char = $json[$i];
+
+        if (ctype_digit($char)) {
+            return true;
+        }
+
+        if (! in_array($char, ['-', '+', '.'], true)) {
+            return false;
+        }
+
+        $j = $i;
+
+        if ($json[$j] === '-' || $json[$j] === '+') {
+            $j++;
+        }
+
+        if ($j < $length && $json[$j] === '.') {
+            $j++;
+        }
+
+        return $j < $length && ctype_digit($json[$j]);
     }
 
     /**

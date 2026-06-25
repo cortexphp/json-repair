@@ -47,6 +47,27 @@ describe('Values and structures', function (): void {
         expect(json_decode($result, true)['key'])->toBe($expected);
     })->with('invalid_numbers');
 
+    it('does not treat a lone sign or dot as a number', function (string $input): void {
+        $result = json_repair($input);
+        expect(json_validate($result))->toBeTrue();
+    })->with([
+        'object dot only' => ['{"key": .}'],
+        'object negative dot' => ['{"key": -.}'],
+        'object positive dot' => ['{"key": +.}'],
+        'object sign only' => ['{"key": -}'],
+        'object dot then key' => ['{"a": ., "b": 1}'],
+        'array dot only' => ['[.]'],
+        'array negative dot' => ['[-.]'],
+        'array dot among numbers' => ['[1, ., 2]'],
+    ]);
+
+    it('still parses valid leading-dot and signed numbers', function (): void {
+        expect(json_decode(json_repair('{"key": .5}'), true)['key'])->toBe(0.5);
+        expect(json_decode(json_repair('{"key": -.5}'), true)['key'])->toBe(-0.5);
+        expect(json_decode(json_repair('{"key": +.5}'), true)['key'])->toBe(0.5);
+        expect(json_decode(json_repair('[1, 2.5, 3]'), true))->toBe([1, 2.5, 3]);
+    });
+
     it(
         'handles strings with special characters',
         function (string $input, string $expectedKey, string $expectedValue): void {
