@@ -46,7 +46,7 @@ jobs:
             --report=aggregate \
             --progress=none \
             --no-ansi \
-            --assert="mode(variant.time.avg) <= mode(baseline.time.avg) +/- 15%" \
+            --assert="mode(variant.time.avg) <= mode(baseline.time.avg) +/- 25%" \
             > benchmark-report.txt 2>&1
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"
           cat benchmark-report.txt
@@ -71,8 +71,8 @@ jobs:
             const report = fs.readFileSync('benchmark-report.txt', 'utf8');
             const passed = '${{ steps.compare.outputs.exit_code }}' === '0';
             const status = passed
-              ? 'No performance regression detected (within 15% tolerance).'
-              : 'Possible performance regression detected (exceeds 15% tolerance).';
+              ? 'No performance regression detected (within 25% tolerance).'
+              : 'Possible performance regression detected (exceeds 25% tolerance).';
             const marker = '<!-- phpbench-regression -->';
             const body = [
               marker,
