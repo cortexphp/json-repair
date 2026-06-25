@@ -183,11 +183,6 @@ class JsonRepairer implements LoggerAwareInterface
             $this->pos = $i;
 
             if ($this->state === ParserState::STATE_IN_STRING_ESCAPE) {
-                if ($i >= strlen($json)) {
-                    $this->state = ParserState::STATE_IN_STRING;
-                    break;
-                }
-
                 $extraCharsConsumed = $this->handleEscapeSequence($char, $json);
                 $this->state = ParserState::STATE_IN_STRING;
                 $i += 1 + $extraCharsConsumed;

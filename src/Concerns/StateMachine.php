@@ -12,15 +12,6 @@ use Cortex\JsonRepair\ParserState;
 trait StateMachine
 {
     /**
-     * Handle an escape sequence within a string.
-     *
-     * Processes escape sequences like \", \\, \/, \b, \f, \n, \r, \t, and
-     * unicode escapes (\uXXXX). Invalid or incomplete escapes are treated
-     * as escaped backslash followed by the character.
-     *
-     * @return int Number of extra characters consumed beyond the escape character itself
-     */
-    /**
      * @var string
      */
     private const VALID_ESCAPES = '"\\/bfnrt';
@@ -652,6 +643,15 @@ trait StateMachine
         return $i;
     }
 
+    /**
+     * Handle an escape sequence within a string.
+     *
+     * Processes escape sequences like \", \\, \/, \b, \f, \n, \r, \t, and
+     * unicode escapes (\uXXXX). Invalid or incomplete escapes are treated
+     * as escaped backslash followed by the character.
+     *
+     * @return int Number of extra characters consumed beyond the escape character itself
+     */
     private function handleEscapeSequence(string $char, string $json): int
     {
         if (str_contains(self::VALID_ESCAPES, $char)) {
