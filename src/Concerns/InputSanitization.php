@@ -21,6 +21,10 @@ trait InputSanitization
      */
     private function extractJsonFromMarkdown(string $input): string
     {
+        if (! str_contains($input, '```')) {
+            return $input;
+        }
+
         $matchCount = preg_match_all('/```json\s*([\s\S]*?)\s*```/', $input, $matches);
 
         if ($matchCount > 0) {
@@ -351,5 +355,75 @@ trait InputSanitization
         }
 
         return $bestMatch ?? $input;
+    }
+
+    /**
+     * Extract all top-level JSON objects or arrays from the input.
+     *
+     * @return list<string>
+     */
+    private function extractAllTopLevelJson(string $input): array
+    {
+        if (json_validate($input)) {
+            return [$input];
+        }
+
+        $length = strlen($input);
+        $results = [];
+        $depth = 0;
+        $start = -1;
+        $inString = false;
+        $stringDelimiter = '';
+        $escapeNext = false;
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $input[$i];
+
+            if ($escapeNext) {
+                $escapeNext = false;
+                continue;
+            }
+
+            if ($inString) {
+                if ($char === '\\') {
+                    $escapeNext = true;
+                    continue;
+                }
+
+                if ($char === $stringDelimiter) {
+                    $inString = false;
+                    $stringDelimiter = '';
+                }
+
+                continue;
+            }
+
+            if ($char === '"' || $char === "'") {
+                $inString = true;
+                $stringDelimiter = $char;
+                continue;
+            }
+
+            if ($char === '{' || $char === '[') {
+                if ($depth === 0) {
+                    $start = $i;
+                }
+
+                $depth++;
+            } elseif (($char === '}' || $char === ']') && $depth > 0) {
+                $depth--;
+
+                if ($depth === 0 && $start !== -1) {
+                    $results[] = substr($input, $start, $i - $start + 1);
+                    $start = -1;
+                }
+            }
+        }
+
+        if ($results === []) {
+            return [$input];
+        }
+
+        return $results;
     }
 }

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Cortex\JsonRepair;
 
+use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LoggerAwareInterface;
 use Cortex\JsonRepair\Concerns\StateMachine;
 use Cortex\JsonRepair\Concerns\RepairLogging;
+use Cortex\JsonRepair\Concerns\OutputTracking;
 use Cortex\JsonRepair\Concerns\StringHeuristics;
 use Cortex\JsonRepair\Concerns\InputSanitization;
 use Cortex\JsonRepair\Exceptions\JsonRepairException;
@@ -19,26 +21,9 @@ class JsonRepairer implements LoggerAwareInterface
     use RepairLogging;
     use StringHeuristics;
     use InputSanitization;
+    use OutputTracking;
 
-    private const int STATE_START = 0;
-
-    private const int STATE_IN_STRING = 1;
-
-    private const int STATE_IN_STRING_ESCAPE = 2;
-
-    private const int STATE_IN_NUMBER = 3;
-
-    private const int STATE_IN_OBJECT_KEY = 4;
-
-    private const int STATE_IN_OBJECT_VALUE = 5;
-
-    private const int STATE_IN_ARRAY = 6;
-
-    private const int STATE_EXPECTING_COLON = 7;
-
-    private const int STATE_EXPECTING_COMMA_OR_END = 8;
-
-    private int $state = self::STATE_START;
+    private int $state = ParserState::STATE_START;
 
     private int $pos = 0;
 
@@ -53,40 +38,32 @@ class JsonRepairer implements LoggerAwareInterface
 
     private string $stringDelimiter = '';
 
-    private int $stateBeforeString = self::STATE_START;
+    private int $stateBeforeString = ParserState::STATE_START;
 
     private int $currentKeyStart = -1;
+
+    /**
+     * @var list<array<string, int>>
+     */
+    private array $objectKeysStack = [];
+
+    private bool $skipNextValue = false;
 
     /**
      * @param string $json The JSON string to repair
      * @param bool $ensureAscii Whether to escape non-ASCII characters (default: true)
      * @param bool $omitEmptyValues Whether to remove keys with missing values instead of adding empty strings (default: false)
      * @param bool $omitIncompleteStrings Whether to remove keys with incomplete string values instead of closing them (default: false)
+     * @param DuplicateKeyPolicy|null $duplicateKeyPolicy How to handle duplicate object keys (default: null — no deduplication)
      */
     public function __construct(
         private readonly string $json,
         private readonly bool $ensureAscii = true,
         private readonly bool $omitEmptyValues = false,
         private readonly bool $omitIncompleteStrings = false,
+        private readonly ?DuplicateKeyPolicy $duplicateKeyPolicy = null,
     ) {}
 
-    /**
-     * Repair the JSON string and return the corrected version.
-     *
-     * This method attempts to fix various common JSON errors including:
-     * - Missing quotes around keys and values
-     * - Missing commas between elements
-     * - Trailing commas
-     * - Unclosed brackets, braces, and strings
-     * - Single quotes instead of double quotes
-     * - Non-standard boolean/null values (True, False, None)
-     * - Incomplete escape sequences
-     * - Missing colons in key-value pairs
-     *
-     * @return string The repaired JSON string
-     *
-     * @throws \Cortex\JsonRepair\Exceptions\JsonRepairException If the repaired JSON is still invalid
-     */
     public function repair(): string
     {
         if (json_validate($this->json)) {
@@ -97,7 +74,78 @@ class JsonRepairer implements LoggerAwareInterface
 
         $this->log('Starting JSON repair');
 
-        // Extract JSON from markdown code blocks if present
+        return $this->repairInternal(extractFirstOnly: true);
+    }
+
+    public function repairWithDetails(): RepairResult
+    {
+        $this->beginFixCollection();
+
+        if (json_validate($this->json)) {
+            $this->log('JSON is already valid, returning as-is');
+
+            return new RepairResult($this->json, true, $this->endFixCollection());
+        }
+
+        $this->log('Starting JSON repair');
+        $repaired = $this->repairInternal(extractFirstOnly: true);
+
+        return new RepairResult($repaired, false, $this->endFixCollection());
+    }
+
+    /**
+     * Repair each top-level JSON value in the input (NDJSON / concatenated objects).
+     *
+     * @return list<string>
+     */
+    public function repairAll(): array
+    {
+        if (json_validate($this->json)) {
+            return [$this->json];
+        }
+
+        $json = $this->extractJsonFromMarkdown($this->json);
+        $json = $this->removeComments($json);
+
+        $segments = $this->extractAllTopLevelJson($json);
+
+        return array_map(
+            $this->repairSegment(...),
+            $segments,
+        );
+    }
+
+    /**
+     * @param int<1, max> $depth
+     */
+    public function decode(
+        int $depth = 512,
+        int $flags = JSON_THROW_ON_ERROR,
+    ): mixed {
+        $repaired = $this->repair();
+
+        return json_decode($repaired, true, $depth, $flags);
+    }
+
+    private function repairSegment(string $json): string
+    {
+        $repairer = new self(
+            $json,
+            $this->ensureAscii,
+            $this->omitEmptyValues,
+            $this->omitIncompleteStrings,
+            $this->duplicateKeyPolicy,
+        );
+
+        if ($this->logger instanceof LoggerInterface) {
+            $repairer->setLogger($this->logger);
+        }
+
+        return $repairer->repair();
+    }
+
+    private function repairInternal(bool $extractFirstOnly): string
+    {
         $json = $this->extractJsonFromMarkdown($this->json);
 
         if ($json !== $this->json) {
@@ -111,18 +159,21 @@ class JsonRepairer implements LoggerAwareInterface
             $json = $jsonWithoutComments;
         }
 
-        // Handle multiple JSON objects
-        $json = $this->extractFirstValidJson($json);
+        if ($extractFirstOnly) {
+            $json = $this->extractFirstValidJson($json);
+        }
 
-        // Reset state
-        $this->state = self::STATE_START;
+        $this->state = ParserState::STATE_START;
         $this->pos = 0;
         $this->output = '';
         $this->stack = [];
         $this->inString = false;
         $this->stringDelimiter = '';
-        $this->stateBeforeString = self::STATE_START;
+        $this->stateBeforeString = ParserState::STATE_START;
         $this->currentKeyStart = -1;
+        $this->objectKeysStack = [];
+        $this->skipNextValue = false;
+        $this->resetOutputTracking();
 
         $length = strlen($json);
         $i = 0;
@@ -131,30 +182,16 @@ class JsonRepairer implements LoggerAwareInterface
             $char = $json[$i];
             $this->pos = $i;
 
-            // Handle escape sequences in strings
-            // @phpstan-ignore identical.alwaysFalse (state changes in loop iterations)
-            if ($this->state === self::STATE_IN_STRING_ESCAPE) {
-                // If we're at the end of the string and in escape state, the escape is incomplete
-                // Just drop the incomplete escape (backslash wasn't added to output yet)
-                if ($i >= strlen($json)) {
-                    $this->state = self::STATE_IN_STRING;
-                    break;
-                }
-
+            if ($this->state === ParserState::STATE_IN_STRING_ESCAPE) {
                 $extraCharsConsumed = $this->handleEscapeSequence($char, $json);
-                $this->state = self::STATE_IN_STRING;
+                $this->state = ParserState::STATE_IN_STRING;
                 $i += 1 + $extraCharsConsumed;
                 continue;
             }
 
-            // Handle characters inside strings
-            // @phpstan-ignore identical.alwaysFalse (state changes in loop iterations)
-            if ($this->state === self::STATE_IN_STRING) {
-                // Check for smart quotes as closing delimiter
-                $smartQuoteLength = $this->getSmartQuoteLength($json, $i);
+            if ($this->state === ParserState::STATE_IN_STRING) {
+                $smartQuoteLength = $char === "\xE2" ? $this->getSmartQuoteLength($json, $i) : 0;
 
-                // Handle double quote inside single-quoted string - must escape it
-                // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (delimiter set when entering string state and can be single quote)
                 if ($char === '"' && $this->stringDelimiter === "'") {
                     $this->log('Escaping double quote inside single-quoted string');
                     $this->output .= '\\"';
@@ -162,16 +199,11 @@ class JsonRepairer implements LoggerAwareInterface
                     continue;
                 }
 
-                // @phpstan-ignore identical.alwaysFalse (delimiter set when entering string state)
                 if ($char === $this->stringDelimiter || $smartQuoteLength > 0) {
-                    // Check if this quote should be escaped (it's inside the string value)
-                    // @phpstan-ignore identical.alwaysFalse (smartQuoteLength can be 0 when char matches delimiter)
                     $isRegularQuote = $smartQuoteLength === 0;
-                    // @phpstan-ignore booleanOr.alwaysFalse
-                    $isInValue = $this->stateBeforeString === self::STATE_IN_OBJECT_VALUE // @phpstan-ignore identical.alwaysFalse
-                        || $this->stateBeforeString === self::STATE_IN_ARRAY; // @phpstan-ignore identical.alwaysFalse
+                    $isInValue = $this->stateBeforeString === ParserState::STATE_IN_OBJECT_VALUE
+                        || $this->stateBeforeString === ParserState::STATE_IN_ARRAY;
 
-                    // @phpstan-ignore booleanAnd.leftAlwaysFalse, booleanAnd.rightAlwaysFalse, booleanAnd.alwaysFalse (variables can be true at runtime)
                     if ($isRegularQuote && $isInValue && $this->shouldEscapeQuoteInValue($json, $i)) {
                         $this->log('Escaping embedded quote inside string value');
                         $this->output .= '\\"';
@@ -179,47 +211,47 @@ class JsonRepairer implements LoggerAwareInterface
                         continue;
                     }
 
-                    // Always close with double quote, even if opened with single quote
                     $this->output .= '"';
                     $this->inString = false;
                     $this->stringDelimiter = '';
                     $this->state = $this->getNextStateAfterString();
 
-                    // Reset key tracking after successfully completing a string value
-                    if ($this->state === self::STATE_EXPECTING_COMMA_OR_END) {
+                    if ($this->state === ParserState::STATE_EXPECTING_COMMA_OR_END) {
                         $this->currentKeyStart = -1;
                     }
 
-                    // @phpstan-ignore greater.alwaysTrue (smartQuoteLength can be 0 when char matches delimiter)
                     $i += $smartQuoteLength > 0 ? $smartQuoteLength : 1;
                     continue;
                 }
 
                 if ($char === '\\') {
-                    // Don't output the backslash yet - let handleEscapeSequence decide
-                    $this->state = self::STATE_IN_STRING_ESCAPE;
+                    $this->state = ParserState::STATE_IN_STRING_ESCAPE;
                     $i++;
                     continue;
                 }
 
-                // Check if this is a structural character that should close an unclosed string
-                // This handles cases like {"key": "value with no closing quote}
                 if (($char === '}' || $char === ']') && $this->shouldCloseStringAtStructuralChar($json, $i)) {
                     $this->log('Closing unclosed string at structural character', [
                         'char' => $char,
                     ]);
-                    // Close the string and let the structural character be processed
                     $this->output .= '"';
                     $this->inString = false;
                     $this->stringDelimiter = '';
                     $this->state = $this->getNextStateAfterString();
 
-                    // Reset key tracking
-                    if ($this->state === self::STATE_EXPECTING_COMMA_OR_END) {
+                    if ($this->state === ParserState::STATE_EXPECTING_COMMA_OR_END) {
                         $this->currentKeyStart = -1;
                     }
 
-                    // Don't increment i - let the structural char be processed in the next iteration
+                    continue;
+                }
+
+                $stopChars = '\\' . $this->stringDelimiter . "\"}\xE2";
+                $runLength = strcspn($json, $stopChars, $i);
+
+                if ($runLength > 0) {
+                    $this->output .= substr($json, $i, $runLength);
+                    $i += $runLength;
                     continue;
                 }
 
@@ -228,54 +260,45 @@ class JsonRepairer implements LoggerAwareInterface
                 continue;
             }
 
-            // Skip whitespace
             if (ctype_space($char)) {
                 $i++;
                 continue;
             }
 
+            if ($this->skipNextValue && ($this->state === ParserState::STATE_IN_OBJECT_VALUE || $this->state === ParserState::STATE_IN_NUMBER)) {
+                $i = $this->skipValueAt($json, $i);
+                $this->skipNextValue = false;
+                $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
+                continue;
+            }
+
             $i = match ($this->state) {
-                // @phpstan-ignore match.alwaysTrue (first iteration starts at STATE_START, then changes)
-                self::STATE_START => $this->handleStart($json, $i),
-                self::STATE_IN_OBJECT_KEY => $this->handleObjectKey($json, $i),
-                self::STATE_EXPECTING_COLON => $this->handleExpectingColon($json, $i),
-                self::STATE_IN_OBJECT_VALUE => $this->handleObjectValue($json, $i),
-                self::STATE_IN_ARRAY => $this->handleArrayValue($json, $i),
-                self::STATE_EXPECTING_COMMA_OR_END => $this->handleExpectingCommaOrEnd($json, $i),
-                self::STATE_IN_NUMBER => $this->handleNumber($json, $i),
+                ParserState::STATE_START => $this->handleStart($json, $i),
+                ParserState::STATE_IN_OBJECT_KEY => $this->handleObjectKey($json, $i),
+                ParserState::STATE_EXPECTING_COLON => $this->handleExpectingColon($json, $i),
+                ParserState::STATE_IN_OBJECT_VALUE => $this->handleObjectValue($json, $i),
+                ParserState::STATE_IN_ARRAY => $this->handleArrayValue($json, $i),
+                ParserState::STATE_EXPECTING_COMMA_OR_END => $this->handleExpectingCommaOrEnd($json, $i),
+                ParserState::STATE_IN_NUMBER => $this->handleNumber($json, $i),
                 default => $i + 1,
             };
         }
 
-        // Close any unclosed strings
-        // @phpstan-ignore if.alwaysFalse (can be true if string wasn't closed in loop)
         if ($this->inString) {
-            // Check if we should remove incomplete string values
-            // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (stateBeforeString is set when entering string state and can be STATE_IN_OBJECT_VALUE)
-            if ($this->omitIncompleteStrings && $this->stateBeforeString === self::STATE_IN_OBJECT_VALUE) {
+            if ($this->omitIncompleteStrings && $this->stateBeforeString === ParserState::STATE_IN_OBJECT_VALUE) {
                 $this->log('Removing incomplete string value (omitIncompleteStrings enabled)');
                 $this->removeCurrentKey();
-                // Update state after removing key
-                $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+                $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
             } else {
                 $this->log('Adding missing closing quote for unclosed string');
                 $this->output .= '"';
-
-                // Note: If we were in escape state, the incomplete escape backslash
-                // was never added to output (we defer adding it to handleEscapeSequence)
-
-                // Update state after closing string
                 $this->state = $this->getNextStateAfterString();
             }
 
             $this->inString = false;
         }
 
-        // Handle incomplete key (key without colon/value)
-        // Check if we're expecting a colon (just finished a key) but don't have one
-        // @phpstan-ignore identical.alwaysFalse (state set to STATE_EXPECTING_COLON after closing string key)
-        if ($this->state === self::STATE_EXPECTING_COLON) {
-            // We have a key but no colon/value - add colon and empty value
+        if ($this->state === ParserState::STATE_EXPECTING_COLON) {
             if ($this->omitEmptyValues) {
                 $this->log('Removing key without value (omitEmptyValues enabled)');
                 $this->removeCurrentKey();
@@ -284,11 +307,8 @@ class JsonRepairer implements LoggerAwareInterface
                 $this->output .= ':""';
             }
 
-            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
-            // @phpstan-ignore identical.alwaysFalse (state can be STATE_IN_OBJECT_KEY for unquoted keys)
-        } elseif ($this->state === self::STATE_IN_OBJECT_KEY) {
-            // We're still in key state - might have an incomplete unquoted key
-            // If output ends with a quote, we have a complete key, add colon and empty value
+            $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
+        } elseif ($this->state === ParserState::STATE_IN_OBJECT_KEY) {
             if (str_ends_with($this->output, '"') && ! str_ends_with($this->output, ':""')) {
                 if ($this->omitEmptyValues) {
                     $this->removeCurrentKey();
@@ -298,12 +318,8 @@ class JsonRepairer implements LoggerAwareInterface
             }
         }
 
-        // If we're in OBJECT_VALUE state and output ends with ':' (possibly with trailing space), add empty string
-        $trimmedForCheck = rtrim($this->output);
-
-        // @phpstan-ignore booleanAnd.alwaysFalse, identical.alwaysFalse (state can change during loop)
-        if ($this->state === self::STATE_IN_OBJECT_VALUE && str_ends_with($trimmedForCheck, ':')) {
-            $this->output = $trimmedForCheck;
+        if ($this->state === ParserState::STATE_IN_OBJECT_VALUE && $this->outputEndsWithNonWhitespace(':')) {
+            $this->trimOutputTrailingWhitespace();
 
             if ($this->omitEmptyValues) {
                 $this->removeCurrentKey();
@@ -311,23 +327,19 @@ class JsonRepairer implements LoggerAwareInterface
                 $this->output .= '""';
             }
 
-            $this->state = self::STATE_EXPECTING_COMMA_OR_END;
+            $this->state = ParserState::STATE_EXPECTING_COMMA_OR_END;
         }
 
-        // Close any unclosed brackets/braces
         while ($this->stack !== []) {
             $expected = array_pop($this->stack);
             $this->log('Adding missing closing bracket/brace', [
                 'char' => $expected,
             ]);
 
-            // Remove trailing comma before closing
             $this->removeTrailingComma();
 
-            $trimmedForBrace = rtrim($this->output);
-
-            if ($expected === '}' && str_ends_with($trimmedForBrace, ':')) {
-                $this->output = $trimmedForBrace;
+            if ($expected === '}' && $this->outputEndsWithNonWhitespace(':')) {
+                $this->trimOutputTrailingWhitespace();
 
                 if ($this->omitEmptyValues) {
                     $this->removeCurrentKey();
@@ -337,39 +349,224 @@ class JsonRepairer implements LoggerAwareInterface
             }
 
             $this->output .= $expected;
+
+            if ($expected === '}') {
+                array_pop($this->objectKeysStack);
+            }
         }
 
-        if (! $this->ensureAscii) {
+        return $this->finalizeOutput();
+    }
+
+    private function finalizeOutput(): string
+    {
+        $encodedViaRoundTrip = false;
+
+        if ($this->ensureAscii && preg_match('/[^\x00-\x7F]/', $this->output) === 1) {
             $decoded = json_decode($this->output, true);
 
-            if ($decoded !== null) {
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $encoded = json_encode($decoded, JSON_UNESCAPED_SLASHES);
+
+                if ($encoded !== false) {
+                    $this->output = $encoded;
+                    $encodedViaRoundTrip = true;
+                }
+            }
+        } elseif (! $this->ensureAscii && $this->output !== '') {
+            $decoded = json_decode($this->output, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
                 $encoded = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
                 if ($encoded !== false) {
                     $this->output = $encoded;
+                    $encodedViaRoundTrip = true;
                 }
             }
         }
 
-        if ($this->output !== '' && ! json_validate($this->output)) {
+        if (! $encodedViaRoundTrip && $this->output !== '' && ! json_validate($this->output)) {
             throw JsonRepairException::invalidJsonAfterRepair($this->output);
         }
 
         return $this->output;
     }
 
-    /**
-     * @param int<1, max> $depth
-     *
-     * @return array<mixed>|object
-     */
-    public function decode(
-        int $depth = 512,
-        int $flags = JSON_THROW_ON_ERROR,
-    ): array|object {
-        $repaired = $this->repair();
-        $decoded = json_decode($repaired, true, $depth, $flags);
+    private function pushObjectKeyScope(): void
+    {
+        $this->objectKeysStack[] = [];
+    }
 
-        return is_array($decoded) ? $decoded : (object) $decoded;
+    private function handleDuplicateKey(string $keyName): bool
+    {
+        if (! $this->duplicateKeyPolicy instanceof DuplicateKeyPolicy || $keyName === '' || $this->objectKeysStack === []) {
+            return false;
+        }
+
+        $depth = count($this->objectKeysStack) - 1;
+
+        if (! isset($this->objectKeysStack[$depth][$keyName])) {
+            $this->objectKeysStack[$depth][$keyName] = $this->currentKeyStart;
+
+            return false;
+        }
+
+        if ($this->duplicateKeyPolicy === DuplicateKeyPolicy::KeepFirst) {
+            $this->log('Skipping duplicate key (keep-first policy)', [
+                'key' => $keyName,
+            ]);
+            $this->removeCurrentKey();
+            $this->skipNextValue = true;
+
+            return true;
+        }
+
+        $this->log('Replacing duplicate key (keep-last policy)', [
+            'key' => $keyName,
+        ]);
+        $this->removePreviousKeyOccurrence($depth, $keyName);
+
+        return false;
+    }
+
+    /**
+     * Remove the earlier occurrence of a duplicate key (keep-last policy) from
+     * the output, preserving every other key/value verbatim.
+     *
+     * Only the region from the previous key up to the *immediately following*
+     * key is removed (its value plus the trailing separator), so intervening
+     * keys are kept. Tracked output offsets are shifted to account for the
+     * removed span. This operates on the output string directly to avoid a
+     * json_decode()/json_encode() round-trip, which would reformat output and
+     * corrupt numbers that exceed PHP's native precision.
+     */
+    private function removePreviousKeyOccurrence(int $depth, string $keyName): void
+    {
+        $previousStart = $this->objectKeysStack[$depth][$keyName];
+        $nextStart = $this->currentKeyStart;
+
+        foreach ($this->objectKeysStack[$depth] as $offset) {
+            if ($offset > $previousStart && $offset < $nextStart) {
+                $nextStart = $offset;
+            }
+        }
+
+        $removedLength = $nextStart - $previousStart;
+        $this->setOutput(substr($this->output, 0, $previousStart) . substr($this->output, $nextStart));
+
+        unset($this->objectKeysStack[$depth][$keyName]);
+
+        foreach ($this->objectKeysStack[$depth] as $name => $offset) {
+            if ($offset >= $nextStart) {
+                $this->objectKeysStack[$depth][$name] = $offset - $removedLength;
+            }
+        }
+
+        $this->currentKeyStart -= $removedLength;
+        $this->objectKeysStack[$depth][$keyName] = $this->currentKeyStart;
+    }
+
+    private function extractCompletedKeyName(): string
+    {
+        if ($this->currentKeyStart < 0) {
+            return '';
+        }
+
+        $segment = substr($this->output, $this->currentKeyStart);
+
+        if (preg_match('/^"((?:[^"\\\\]|\\\\.)*)"/', $segment, $matches) !== 1) {
+            return '';
+        }
+
+        $decoded = json_decode('"' . $matches[1] . '"');
+
+        return is_string($decoded) ? $decoded : $matches[1];
+    }
+
+    private function skipValueAt(string $json, int $i): int
+    {
+        $length = strlen($json);
+
+        while ($i < $length && ctype_space($json[$i])) {
+            $i++;
+        }
+
+        if ($i >= $length) {
+            return $i;
+        }
+
+        $char = $json[$i];
+
+        if ($char === '"' || $char === "'") {
+            $delimiter = $char;
+            $i++;
+
+            while ($i < $length) {
+                if ($json[$i] === '\\') {
+                    $i += 2;
+                    continue;
+                }
+
+                if ($json[$i] === $delimiter) {
+                    return $i + 1;
+                }
+
+                $i++;
+            }
+
+            return $i;
+        }
+
+        if ($char === '{' || $char === '[') {
+            $depth = 0;
+
+            while ($i < $length) {
+                $current = $json[$i];
+
+                if ($current === '"' || $current === "'") {
+                    $delimiter = $current;
+                    $i++;
+
+                    while ($i < $length) {
+                        if ($json[$i] === '\\') {
+                            $i += 2;
+
+                            continue;
+                        }
+
+                        if ($json[$i] === $delimiter) {
+                            $i++;
+
+                            break;
+                        }
+
+                        $i++;
+                    }
+
+                    continue;
+                }
+
+                if ($current === '{' || $current === '[') {
+                    $depth++;
+                } elseif ($current === '}' || $current === ']') {
+                    $depth--;
+
+                    if ($depth === 0) {
+                        return $i + 1;
+                    }
+                }
+
+                $i++;
+            }
+
+            return $i;
+        }
+
+        while ($i < $length && ! in_array($json[$i], [',', '}', ']'], true)) {
+            $i++;
+        }
+
+        return $i;
     }
 }
