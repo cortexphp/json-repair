@@ -117,7 +117,7 @@ $repaired = $repairer->repair();
 ```php
 use Cortex\JsonRepair\JsonRepairer;
 
-$result = (new JsonRepairer("{'key': 'value'}"))->repairWithDetails();
+$result = new JsonRepairer("{'key': 'value'}")->repairWithDetails();
 // $result->json, $result->wasAlreadyValid, $result->fixes
 ```
 
@@ -126,7 +126,7 @@ $result = (new JsonRepairer("{'key': 'value'}"))->repairWithDetails();
 `repairAll()` repairs each top-level JSON value separately:
 
 ```php
-$results = (new JsonRepairer("{'a':1}\n{'b':2}"))->repairAll();
+$results = new JsonRepairer("{'a':1}\n{'b':2}")->repairAll();
 // ['{"a": 1}', '{"b": 2}']
 ```
 
@@ -147,7 +147,7 @@ $partial = $stream->current(); // closes incomplete string/braces
 `decode()` returns `mixed` — top-level scalars (strings, numbers, booleans, null) decode directly without being cast to arrays:
 
 ```php
-(new JsonRepairer('true'))->decode(); // true
+new JsonRepairer('true')->decode(); // true
 json_repair_decode('null');          // null
 ```
 

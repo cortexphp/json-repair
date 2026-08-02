@@ -77,7 +77,7 @@ describe('RepairResult', function (): void {
     });
 
     it('marks valid JSON as already valid', function (): void {
-        $repairResult = (new JsonRepairer('{"key": "value"}'))->repairWithDetails();
+        $repairResult = new JsonRepairer('{"key": "value"}')->repairWithDetails();
 
         expect($repairResult->wasAlreadyValid)->toBeTrue()
             ->and($repairResult->json)
@@ -261,6 +261,6 @@ describe('Scalar decode', function (): void {
     });
 
     it('decodes top-level string scalars', function (): void {
-        expect((new JsonRepairer('"hello"'))->decode())->toBe('hello');
+        expect(new JsonRepairer('"hello"')->decode())->toBe('hello');
     });
 });

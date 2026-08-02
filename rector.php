@@ -15,7 +15,9 @@ return RectorConfig::configure()
         importDocBlockNames: false,
         removeUnusedImports: true,
     )
-    ->withPhpSets()
+    ->withPhpSets(
+        php84: true,
+    )
     ->withSets([
         PestSetList::CODING_STYLE,
     ])
