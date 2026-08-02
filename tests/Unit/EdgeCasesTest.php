@@ -13,8 +13,9 @@ covers(JsonRepairer::class);
 describe('Edge cases and special features', function (): void {
     it('handles incomplete JSON at end of string', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -22,8 +23,9 @@ describe('Edge cases and special features', function (): void {
 
     it('repairs incomplete JSON from streaming LLM responses', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -35,21 +37,32 @@ describe('Edge cases and special features', function (): void {
         expect(json_validate($result))->toBeTrue();
 
         $decoded = json_decode($result, true);
-        expect($decoded)->toBeArray();
-        expect($decoded['resourceType'])->toBe('Bundle');
-        expect($decoded['id'])->toBe('1');
-        expect($decoded['type'])->toBe('collection');
-        expect($decoded['entry'])->toBeArray();
-        expect($decoded['entry'][0]['resource']['resourceType'])->toBe('Patient');
-        expect($decoded['entry'][0]['resource']['name'])->toBeArray();
-        expect($decoded['entry'][0]['resource']['name'])->toHaveCount(1);
-        expect($decoded['entry'][0]['resource']['name'][0]['use'])->toBe('official');
-        expect($decoded['entry'][0]['resource']['name'][0]['family'])->toBe('Corwin');
-        expect($decoded['entry'][0]['resource']['name'][0]['given'])->toBe(['Keisha', 'Sunny']);
-        expect($decoded['entry'][0]['resource']['name'][0]['prefix'][0])->toBe('Mrs.');
-        expect($decoded['entry'][0]['resource']['name'][0]['prefix'][1])->toBeArray();
-        expect($decoded['entry'][0]['resource']['name'][0]['prefix'][1]['use'])->toBe('maiden');
-        expect($decoded['entry'][0]['resource']['name'][0]['prefix'][1]['family'])->toBe('Goodwin');
+        expect($decoded)->toBeArray()
+            ->toMatchArray([
+                'resourceType' => 'Bundle',
+                'id' => '1',
+                'type' => 'collection',
+            ])
+            ->and($decoded['entry'])
+            ->toBeArray()
+            ->and($decoded['entry'][0]['resource']['resourceType'])
+            ->toBe('Patient')
+            ->and($decoded['entry'][0]['resource']['name'])
+            ->toBeArray()
+            ->toHaveCount(1)
+            ->and($decoded['entry'][0]['resource']['name'][0])
+            ->toMatchArray([
+                'use' => 'official',
+                'family' => 'Corwin',
+                'given' => ['Keisha', 'Sunny'],
+            ])
+            ->and($decoded['entry'][0]['resource']['name'][0]['prefix'])
+            ->sequence(fn($e) => $e->toBe('Mrs.'), fn($e) => $e->toBeArray())
+            ->and($decoded['entry'][0]['resource']['name'][0]['prefix'][1])
+            ->toMatchArray([
+                'use' => 'maiden',
+                'family' => 'Goodwin',
+            ]);
     });
 
     it('handles multiple JSON objects', function (string $input, ?string $expectedKey, ?string $expectedValue): void {
@@ -81,8 +94,9 @@ describe('Edge cases and special features', function (): void {
 
     it('handles markdown links in strings', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -90,8 +104,9 @@ describe('Edge cases and special features', function (): void {
 
     it('handles leading and trailing characters', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -99,8 +114,9 @@ describe('Edge cases and special features', function (): void {
 
     it('handles JSON code blocks inside string values', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -119,7 +135,8 @@ describe('Edge cases and special features', function (): void {
 
     it('removes comments', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
     })->with('comments');
 });

@@ -17,9 +17,11 @@ describe('Logging', function (): void {
 
         $result = json_repair('{"key": "value"}', logger: $logger);
 
-        expect($logger->hasDebug('JSON is already valid, returning as-is'))->toBeTrue();
-        expect($logger->records)->toHaveCount(1);
-        expect($result)->toBe('{"key": "value"}');
+        expect($logger->hasDebug('JSON is already valid, returning as-is'))->toBeTrue()
+            ->and($logger->records)
+            ->toHaveCount(1)
+            ->and($result)
+            ->toBe('{"key": "value"}');
     });
 
     it('logs repair actions for unclosed strings and brackets', function (): void {
@@ -27,12 +29,15 @@ describe('Logging', function (): void {
 
         $result = json_repair('{"key": "value', logger: $logger);
 
-        expect($logger->hasDebug('Starting JSON repair'))->toBeTrue();
-        expect($logger->hasDebug('Adding missing closing quote for unclosed string'))->toBeTrue();
-        expect($logger->hasDebug('Adding missing closing bracket/brace'))->toBeTrue();
-
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe('{"key": "value"}');
+        expect($logger->hasDebug('Starting JSON repair'))->toBeTrue()
+            ->and($logger->hasDebug('Adding missing closing quote for unclosed string'))
+            ->toBeTrue()
+            ->and($logger->hasDebug('Adding missing closing bracket/brace'))
+            ->toBeTrue()
+            ->and(json_validate($result))
+            ->toBeTrue()
+            ->and($result)
+            ->toBe('{"key": "value"}');
     });
 
     it('logs quote conversions and boolean normalization', function (): void {
@@ -40,14 +45,17 @@ describe('Logging', function (): void {
 
         $result = json_repair("{'active': True}", logger: $logger);
 
-        expect($logger->hasDebug('Converting single-quoted key to double quotes'))->toBeTrue();
-        expect($logger->hasDebugThatPasses(
-            fn(array $record): bool => $record['message'] === 'Normalizing boolean/null value'
-            && $record['context']['from'] === 'True'
-            && $record['context']['to'] === 'true',
-        ))->toBeTrue();
-
-        expect($result)->toBe('{"active": true}');
+        expect($logger->hasDebug('Converting single-quoted key to double quotes'))->toBeTrue()
+            ->and(
+                $logger->hasDebugThatPasses(
+                    fn(array $record): bool => $record['message'] === 'Normalizing boolean/null value'
+        && $record['context']['from'] === 'True'
+        && $record['context']['to'] === 'true',
+                ),
+            )
+            ->toBeTrue()
+            ->and($result)
+            ->toBe('{"active": true}');
     });
 
     it('logs unquoted key and value repairs', function (): void {
@@ -55,10 +63,11 @@ describe('Logging', function (): void {
 
         $result = json_repair('{name: John}', logger: $logger);
 
-        expect($logger->hasDebug('Adding quotes around unquoted key'))->toBeTrue();
-        expect($logger->hasDebug('Found unquoted string value, adding quotes'))->toBeTrue();
-
-        expect($result)->toBe('{"name": "John"}');
+        expect($logger->hasDebug('Adding quotes around unquoted key'))->toBeTrue()
+            ->and($logger->hasDebug('Found unquoted string value, adding quotes'))
+            ->toBeTrue()
+            ->and($result)
+            ->toBe('{"name": "John"}');
     });
 
     it('logs missing comma and colon insertions', function (): void {
@@ -66,10 +75,11 @@ describe('Logging', function (): void {
 
         $result = json_repair('{"a": 1 "b" 2}', logger: $logger);
 
-        expect($logger->hasDebug('Inserting missing comma'))->toBeTrue();
-        expect($logger->hasDebug('Inserting missing colon after key'))->toBeTrue();
-
-        expect(json_validate($result))->toBeTrue();
+        expect($logger->hasDebug('Inserting missing comma'))->toBeTrue()
+            ->and($logger->hasDebug('Inserting missing colon after key'))
+            ->toBeTrue()
+            ->and(json_validate($result))
+            ->toBeTrue();
     });
 
     it('logs context with position information', function (): void {
@@ -90,8 +100,9 @@ describe('Logging', function (): void {
 
         $result = json_repair('```json {"key": "value"} ```', logger: $logger);
 
-        expect($logger->hasDebug('Extracted JSON from markdown code block'))->toBeTrue();
-        expect($result)->toBe('{"key": "value"}');
+        expect($logger->hasDebug('Extracted JSON from markdown code block'))->toBeTrue()
+            ->and($result)
+            ->toBe('{"key": "value"}');
     });
 
     it('logs omitEmptyValues actions', function (): void {
@@ -99,8 +110,9 @@ describe('Logging', function (): void {
 
         $result = json_repair('{"a": 1, "b": }', omitEmptyValues: true, logger: $logger);
 
-        expect($logger->hasDebug('Removing key with missing value (omitEmptyValues enabled)'))->toBeTrue();
-        expect($result)->toBe('{"a": 1}');
+        expect($logger->hasDebug('Removing key with missing value (omitEmptyValues enabled)'))->toBeTrue()
+            ->and($result)
+            ->toBe('{"a": 1}');
     });
 
     it('works with JsonRepairer class and setLogger', function (): void {
@@ -111,7 +123,8 @@ describe('Logging', function (): void {
 
         $result = $repairer->repair();
 
-        expect($logger->hasDebugRecords())->toBeTrue();
-        expect($result)->toBe('{"key": "value"}');
+        expect($logger->hasDebugRecords())->toBeTrue()
+            ->and($result)
+            ->toBe('{"key": "value"}');
     });
 });

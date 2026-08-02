@@ -15,25 +15,30 @@ describe('API usage', function (): void {
     it('works with JsonRepairer class directly', function (): void {
         $repairer = new JsonRepairer("{'key': 'value'}");
         $result = $repairer->repair();
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true)['key'])->toBe('value');
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true)['key'])
+            ->toBe('value');
     });
 
     it('can decode repaired JSON', function (): void {
         $repairer = new JsonRepairer("{'key': 'value', 'number': 123}");
         $decoded = $repairer->decode();
 
-        expect($decoded)->toBeArray();
-        expect($decoded['key'])->toBe('value');
-        expect($decoded['number'])->toBe(123);
+        expect($decoded)->toBeArray()
+            ->toMatchArray([
+                'key' => 'value',
+                'number' => 123,
+            ]);
     });
 
     it('can use json_repair_decode helper function', function (): void {
         $decoded = json_repair_decode("{'key': 'value', 'number': 123}");
 
-        expect($decoded)->toBeArray();
-        expect($decoded['key'])->toBe('value');
-        expect($decoded['number'])->toBe(123);
+        expect($decoded)->toBeArray()
+            ->toMatchArray([
+                'key' => 'value',
+                'number' => 123,
+            ]);
     });
 
     it('works with JsonRepairer class directly with omitEmptyValues', function (): void {
@@ -54,8 +59,8 @@ describe('API usage', function (): void {
 
     it('works with json_repair_decode with new options', function (): void {
         $decoded = json_repair_decode('{"key": }', omitEmptyValues: true);
-        expect($decoded)->toBeArray();
-        expect($decoded)->toBe([]);
+        expect($decoded)->toBeArray()
+            ->toBe([]);
     });
 });
 
@@ -64,17 +69,21 @@ describe('RepairResult', function (): void {
         $repairer = new JsonRepairer("{'key': 'value'}");
         $repairResult = $repairer->repairWithDetails();
 
-        expect($repairResult->wasAlreadyValid)->toBeFalse();
-        expect($repairResult->json)->toBe('{"key": "value"}');
-        expect($repairResult->fixes)->toContain('Starting JSON repair');
+        expect($repairResult->wasAlreadyValid)->toBeFalse()
+            ->and($repairResult->json)
+            ->toBe('{"key": "value"}')
+            ->and($repairResult->fixes)
+            ->toContain('Starting JSON repair');
     });
 
     it('marks valid JSON as already valid', function (): void {
         $repairResult = (new JsonRepairer('{"key": "value"}'))->repairWithDetails();
 
-        expect($repairResult->wasAlreadyValid)->toBeTrue();
-        expect($repairResult->json)->toBe('{"key": "value"}');
-        expect($repairResult->fixes)->toContain('JSON is already valid, returning as-is');
+        expect($repairResult->wasAlreadyValid)->toBeTrue()
+            ->and($repairResult->json)
+            ->toBe('{"key": "value"}')
+            ->and($repairResult->fixes)
+            ->toContain('JSON is already valid, returning as-is');
     });
 });
 
@@ -83,39 +92,45 @@ describe('repairAll', function (): void {
         $repairer = new JsonRepairer('{"a":1}{"b":2}');
         $results = $repairer->repairAll();
 
-        expect($results)->toHaveCount(2);
-        expect(json_decode($results[0], true))->toBe([
-            'a' => 1,
-        ]);
-        expect(json_decode($results[1], true))->toBe([
-            'b' => 2,
-        ]);
+        expect($results)->toHaveCount(2)
+            ->and(json_decode($results[0], true))
+            ->toBe([
+                'a' => 1,
+            ])
+            ->and(json_decode($results[1], true))
+            ->toBe([
+                'b' => 2,
+            ]);
     });
 
     it('repairs NDJSON lines', function (): void {
         $repairer = new JsonRepairer("{'a':1}\n{'b':2}");
         $results = $repairer->repairAll();
 
-        expect($results)->toHaveCount(2);
-        expect(json_decode($results[0], true))->toBe([
-            'a' => 1,
-        ]);
-        expect(json_decode($results[1], true))->toBe([
-            'b' => 2,
-        ]);
+        expect($results)->toHaveCount(2)
+            ->and(json_decode($results[0], true))
+            ->toBe([
+                'a' => 1,
+            ])
+            ->and(json_decode($results[1], true))
+            ->toBe([
+                'b' => 2,
+            ]);
     });
 
     it('repairs top-level values despite leading stray closing brackets', function (): void {
         $repairer = new JsonRepairer('}{"a":1}{"b":2}');
         $results = $repairer->repairAll();
 
-        expect($results)->toHaveCount(2);
-        expect(json_decode($results[0], true))->toBe([
-            'a' => 1,
-        ]);
-        expect(json_decode($results[1], true))->toBe([
-            'b' => 2,
-        ]);
+        expect($results)->toHaveCount(2)
+            ->and(json_decode($results[0], true))
+            ->toBe([
+                'a' => 1,
+            ])
+            ->and(json_decode($results[1], true))
+            ->toBe([
+                'b' => 2,
+            ]);
     });
 });
 
@@ -142,33 +157,36 @@ describe('Duplicate key policy', function (): void {
         $repairer = new JsonRepairer('{a: 1, b: 2, a: 3}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepFirst);
         $result = $repairer->repair();
 
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true))->toBe([
-            'a' => 1,
-            'b' => 2,
-        ]);
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'a' => 1,
+                'b' => 2,
+            ]);
     });
 
     it('keeps last non-adjacent duplicate key without dropping intervening keys', function (): void {
         $repairer = new JsonRepairer('{a: 1, b: 2, a: 3}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepLast);
         $result = $repairer->repair();
 
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true))->toBe([
-            'b' => 2,
-            'a' => 3,
-        ]);
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'b' => 2,
+                'a' => 3,
+            ]);
     });
 
     it('keeps last across multiple non-adjacent duplicates', function (): void {
         $repairer = new JsonRepairer('{a: 1, b: 2, a: 3, b: 4}', duplicateKeyPolicy: DuplicateKeyPolicy::KeepLast);
         $result = $repairer->repair();
 
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true))->toBe([
-            'a' => 3,
-            'b' => 4,
-        ]);
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'a' => 3,
+                'b' => 4,
+            ]);
     });
 
     it('does not corrupt large integers when keep-last is enabled', function (): void {
@@ -178,9 +196,9 @@ describe('Duplicate key policy', function (): void {
         );
         $result = $repairer->repair();
 
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toContain('12345678901234567890');
-        expect($result)->not->toContain('e+');
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toContain('12345678901234567890')->not->toContain('e+');
     });
 
     it('preserves large integers while still deduplicating with keep-last', function (): void {
@@ -190,9 +208,9 @@ describe('Duplicate key policy', function (): void {
         );
         $result = $repairer->repair();
 
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toContain('12345678901234567890');
-        expect($result)->not->toContain('e+');
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toContain('12345678901234567890')->not->toContain('e+');
 
         $decoded = json_decode($result, true);
         expect($decoded['a'])->toBe(2);
@@ -205,11 +223,12 @@ describe('Duplicate key policy', function (): void {
         );
         $result = $repairer->repair();
 
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true))->toBe([
-            'a' => 1,
-            'z' => 9,
-        ]);
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'a' => 1,
+                'z' => 9,
+            ]);
     });
 
     it(
@@ -221,11 +240,12 @@ describe('Duplicate key policy', function (): void {
             );
             $result = $repairer->repair();
 
-            expect(json_validate($result))->toBeTrue();
-            expect(json_decode($result, true))->toBe([
-                'a' => 1,
-                'z' => 9,
-            ]);
+            expect(json_validate($result))->toBeTrue()
+                ->and(json_decode($result, true))
+                ->toBe([
+                    'a' => 1,
+                    'z' => 9,
+                ]);
         },
     );
 });

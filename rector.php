@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
+use Pest\Rector\Set\PestSetList;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -15,6 +16,9 @@ return RectorConfig::configure()
         removeUnusedImports: true,
     )
     ->withPhpSets()
+    ->withSets([
+        PestSetList::CODING_STYLE,
+    ])
     ->withPreparedSets(
         deadCode: true,
         codeQuality: true,

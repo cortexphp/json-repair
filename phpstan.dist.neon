@@ -1,5 +1,6 @@
 includes:
   - vendor/phpstan/phpstan-strict-rules/rules.neon
+  - vendor/pestphp/pest-plugin-phpstan/extension.neon
 
 parameters:
   level: 10
