@@ -13,8 +13,9 @@ covers(JsonRepairer::class);
 describe('JSON repairs', function (): void {
     it('passes through valid JSON unchanged', function (string $json): void {
         $result = json_repair($json);
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true))->toBe(json_decode($json, true));
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe(json_decode($json, true));
     })->with('valid_json');
 
     it('handles non-JSON strings', function (string $input, string $expected): void {
@@ -22,15 +23,17 @@ describe('JSON repairs', function (): void {
         expect($result)->toBe($expected);
 
         if ($result !== '') {
-            expect(json_validate($result))->toBeTrue();
-            expect(json_decode($result, true))->toBe([]);
+            expect(json_validate($result))->toBeTrue()
+                ->and(json_decode($result, true))
+                ->toBe([]);
         }
     })->with('parse_string');
 
     it('repairs single quotes to double quotes', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -38,8 +41,9 @@ describe('JSON repairs', function (): void {
 
     it('repairs unquoted keys', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -47,14 +51,18 @@ describe('JSON repairs', function (): void {
 
     it('repairs missing quotes around keys', function (): void {
         $result = json_repair('{key: "value"}');
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true)['key'])->toBe('value');
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'key' => 'value',
+            ]);
     });
 
     it('handles mixed single and double quotes', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -62,14 +70,16 @@ describe('JSON repairs', function (): void {
 
     it('handles quotes inside string values', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
     })->with('quotes_inside_strings');
 
     it('repairs trailing commas', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -77,8 +87,9 @@ describe('JSON repairs', function (): void {
 
     it('repairs missing commas', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -86,14 +97,18 @@ describe('JSON repairs', function (): void {
 
     it('repairs missing colons', function (): void {
         $result = json_repair('{"key" "value"}');
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true)['key'])->toBe('value');
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'key' => 'value',
+            ]);
     });
 
     it('repairs missing closing brackets', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -103,9 +118,20 @@ describe('JSON repairs', function (): void {
         $result = json_repair($input);
         expect(json_validate($result))->toBeTrue();
         $decoded = json_decode($result, true);
+        expect($decoded)->toBeArray();
+
+        if (! is_array($decoded)) {
+            return;
+        }
 
         $value = $decoded;
         foreach (explode('.', $expectedPath) as $key) {
+            expect($value)->toBeArray()->toHaveKey($key);
+
+            if (! is_array($value)) {
+                return;
+            }
+
             $value = $value[$key];
         }
 
@@ -114,8 +140,9 @@ describe('JSON repairs', function (): void {
 
     it('repairs missing values', function (string $input, string $expected): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        expect($result)->toBe($expected);
+        expect(json_validate($result))->toBeTrue()
+            ->and($result)
+            ->toBe($expected);
 
         $decoded = json_decode($result, true);
         expect($decoded)->toBe(json_decode($expected, true));
@@ -124,10 +151,10 @@ describe('JSON repairs', function (): void {
     it('handles missing keys in objects', function (): void {
         $input = '{: "value"}';
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        $decoded = json_decode($result, true);
-        expect($decoded)->toBeArray();
-        expect($decoded)->toHaveKey('value');
-        expect($decoded['value'])->toBe('');
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'value' => '',
+            ]);
     });
 });

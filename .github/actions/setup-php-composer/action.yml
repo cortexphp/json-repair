@@ -5,7 +5,7 @@ inputs:
   php-version:
     description: 'PHP version to use'
     required: false
-    default: '8.3'
+    default: '8.4'
   coverage:
     description: 'Coverage driver to use (none, xdebug, pcov)'
     required: false

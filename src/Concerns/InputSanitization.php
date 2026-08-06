@@ -166,7 +166,7 @@ trait InputSanitization
                     $this->log('Removing multi-line comment');
                     $i += 2;
 
-                    while ($i + 1 < $length && ! ($input[$i] === '*' && $input[$i + 1] === '/')) {
+                    while ($i + 1 < $length && ($input[$i] !== '*' || $input[$i + 1] !== '/')) {
                         $i++;
                     }
 

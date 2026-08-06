@@ -49,7 +49,7 @@ use Cortex\JsonRepair\JsonRepairer;
 use Cortex\JsonRepair\Exceptions\JsonRepairException;
 
 try {
-    $repaired = (new JsonRepairer($input))->repair();
+    $repaired = new JsonRepairer($input)->repair();
 } catch (JsonRepairException $e) {
     // input could not be repaired into valid JSON
 }

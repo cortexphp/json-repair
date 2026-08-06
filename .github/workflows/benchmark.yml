@@ -25,7 +25,7 @@ jobs:
       - name: Setup PHP and Composer
         uses: ./.github/actions/setup-php-composer
         with:
-          php-version: 8.3
+          php-version: 8.4
 
       # Store a baseline from the PR's base branch on this same runner, so the
       # comparison is hardware-consistent (baselines are never committed).

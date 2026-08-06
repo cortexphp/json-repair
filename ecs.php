@@ -33,7 +33,7 @@ return ECSConfig::configure()
         cleanCode: true,
     )
     ->withPhpCsFixerSets(
-        php83Migration: true,
+        php84Migration: true,
     )
     ->withRules([
         NotOperatorWithSuccessorSpaceFixer::class,

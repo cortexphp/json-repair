@@ -16,9 +16,10 @@ describe('StreamingJsonRepairer', function (): void {
 
         $result = $stream->current();
 
-        expect(json_validate($result))->toBeTrue();
-        expect(json_decode($result, true))->toBe([
-            'key' => 'val',
-        ]);
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'key' => 'val',
+            ]);
     });
 });

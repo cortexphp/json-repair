@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
+use Pest\Rector\Set\PestSetList;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -14,7 +15,12 @@ return RectorConfig::configure()
         importDocBlockNames: false,
         removeUnusedImports: true,
     )
-    ->withPhpSets()
+    ->withPhpSets(
+        php84: true,
+    )
+    ->withSets([
+        PestSetList::CODING_STYLE,
+    ])
     ->withPreparedSets(
         deadCode: true,
         codeQuality: true,

@@ -8,7 +8,7 @@ Repair invalid JSON strings by automatically fixing common syntax errors like si
 
 ## Requirements
 
-- PHP 8.3+
+- PHP 8.4+
 - JSON PHP extension
 
 ## Installation
@@ -28,14 +28,14 @@ use function Cortex\JsonRepair\json_repair_decode;
 // Broken JSON (single quotes, unquoted keys, trailing comma)
 $broken = "{'name': 'John', age: 30, active: true,}";
 
-$repaired = (new JsonRepairer($broken))->repair();
+$repaired = new JsonRepairer($broken)->repair();
 // {"name": "John", "age": 30, "active": true}
 
 // Or use the helper function
 $repaired = json_repair($broken);
 
 // Repair and decode in one step
-$data = (new JsonRepairer($broken))->decode();
+$data = new JsonRepairer($broken)->decode();
 // ['name' => 'John', 'age' => 30, 'active' => true]
 
 // Or use the helper function

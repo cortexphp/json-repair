@@ -14,8 +14,9 @@ describe('Options', function (): void {
     describe('omitEmptyValues', function (): void {
         it('omits empty values when omitEmptyValues is true', function (string $input, string $expected): void {
             $result = json_repair($input, omitEmptyValues: true);
-            expect(json_validate($result))->toBeTrue();
-            expect($result)->toBe($expected);
+            expect(json_validate($result))->toBeTrue()
+                ->and($result)
+                ->toBe($expected);
 
             $decoded = json_decode($result, true);
             expect($decoded)->toBe(json_decode($expected, true));
@@ -23,8 +24,9 @@ describe('Options', function (): void {
 
         it('keeps empty values when omitEmptyValues is false', function (string $input, string $expected): void {
             $result = json_repair($input, omitEmptyValues: false);
-            expect(json_validate($result))->toBeTrue();
-            expect($result)->toBe($expected);
+            expect(json_validate($result))->toBeTrue()
+                ->and($result)
+                ->toBe($expected);
 
             $decoded = json_decode($result, true);
             expect($decoded)->toBe(json_decode($expected, true));
@@ -34,8 +36,9 @@ describe('Options', function (): void {
             $input = '{"user": {"name": "John", "age": }, "meta": {"count": }}';
             $expected = '{"user": {"name": "John"}, "meta": {}}';
             $result = json_repair($input, omitEmptyValues: true);
-            expect(json_validate($result))->toBeTrue();
-            expect($result)->toBe($expected);
+            expect(json_validate($result))->toBeTrue()
+                ->and($result)
+                ->toBe($expected);
 
             $decoded = json_decode($result, true);
             expect($decoded)->toBe([
@@ -50,8 +53,9 @@ describe('Options', function (): void {
             $input = '{"key": }';
             $expected = '{}';
             $result = json_repair($input, omitEmptyValues: true);
-            expect(json_validate($result))->toBeTrue();
-            expect($result)->toBe($expected);
+            expect(json_validate($result))->toBeTrue()
+                ->and($result)
+                ->toBe($expected);
 
             $decoded = json_decode($result, true);
             expect($decoded)->toBe([]);
@@ -63,8 +67,9 @@ describe('Options', function (): void {
             'omits incomplete strings when omitIncompleteStrings is true',
             function (string $input, string $expected): void {
                 $result = json_repair($input, omitIncompleteStrings: true);
-                expect(json_validate($result))->toBeTrue();
-                expect($result)->toBe($expected);
+                expect(json_validate($result))->toBeTrue()
+                    ->and($result)
+                    ->toBe($expected);
 
                 $decoded = json_decode($result, true);
                 expect($decoded)->toBe(json_decode($expected, true));
@@ -75,8 +80,9 @@ describe('Options', function (): void {
             'keeps incomplete strings when omitIncompleteStrings is false',
             function (string $input, string $expected): void {
                 $result = json_repair($input, omitIncompleteStrings: false);
-                expect(json_validate($result))->toBeTrue();
-                expect($result)->toBe($expected);
+                expect(json_validate($result))->toBeTrue()
+                    ->and($result)
+                    ->toBe($expected);
 
                 $decoded = json_decode($result, true);
                 expect($decoded)->toBe(json_decode($expected, true));
@@ -87,8 +93,9 @@ describe('Options', function (): void {
             $input = '{"key": "val';
             $expected = '{}';
             $result = json_repair($input, omitIncompleteStrings: true);
-            expect(json_validate($result))->toBeTrue();
-            expect($result)->toBe($expected);
+            expect(json_validate($result))->toBeTrue()
+                ->and($result)
+                ->toBe($expected);
 
             $decoded = json_decode($result, true);
             expect($decoded)->toBe([]);
@@ -100,8 +107,9 @@ describe('Options', function (): void {
             'handles both omitEmptyValues and omitIncompleteStrings together',
             function (string $input, string $expected): void {
                 $result = json_repair($input, omitEmptyValues: true, omitIncompleteStrings: true);
-                expect(json_validate($result))->toBeTrue();
-                expect($result)->toBe($expected);
+                expect(json_validate($result))->toBeTrue()
+                    ->and($result)
+                    ->toBe($expected);
 
                 $decoded = json_decode($result, true);
                 expect($decoded)->toBe(json_decode($expected, true));
