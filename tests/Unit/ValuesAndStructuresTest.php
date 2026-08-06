@@ -38,7 +38,9 @@ describe('Values and structures', function (): void {
             return;
         }
 
-        expect(json_decode($result, true)['key'])->toBe($expected);
+        expect(json_decode($result, true))->toMatchArray([
+            'key' => $expected,
+        ]);
     })->with('numbers');
 
     it('repairs invalid numbers', function (string $input, string $expectedJson, int|float $expected): void {
@@ -46,8 +48,10 @@ describe('Values and structures', function (): void {
         expect(json_validate($result))->toBeTrue()
             ->and($result)
             ->toBe($expectedJson)
-            ->and(json_decode($result, true)['key'])
-            ->toBe($expected);
+            ->and(json_decode($result, true))
+            ->toMatchArray([
+                'key' => $expected,
+            ]);
     })->with('invalid_numbers');
 
     it('does not treat a lone sign or dot as a number', function (string $input): void {
@@ -65,11 +69,17 @@ describe('Values and structures', function (): void {
     ]);
 
     it('still parses valid leading-dot and signed numbers', function (): void {
-        expect(json_decode(json_repair('{"key": .5}'), true)['key'])->toBe(0.5)
-            ->and(json_decode(json_repair('{"key": -.5}'), true)['key'])
-            ->toBe(-0.5)
-            ->and(json_decode(json_repair('{"key": +.5}'), true)['key'])
-            ->toBe(0.5)
+        expect(json_decode(json_repair('{"key": .5}'), true))->toBe([
+            'key' => 0.5,
+        ])
+            ->and(json_decode(json_repair('{"key": -.5}'), true))
+            ->toBe([
+                'key' => -0.5,
+            ])
+            ->and(json_decode(json_repair('{"key": +.5}'), true))
+            ->toBe([
+                'key' => 0.5,
+            ])
             ->and(json_decode(json_repair('[1, 2.5, 3]'), true))
             ->toBe([1, 2.5, 3]);
     });
@@ -79,8 +89,10 @@ describe('Values and structures', function (): void {
         function (string $input, int|float $expected): void {
             $result = json_repair($input);
             expect(json_validate($result))->toBeTrue()
-                ->and(json_decode($result, true)['key'])
-                ->toBe($expected);
+                ->and(json_decode($result, true))
+                ->toMatchArray([
+                    'key' => $expected,
+                ]);
         },
     )->with([
         'plus exponent no digits' => ['{"key": 1e+}', 1],
@@ -97,29 +109,34 @@ describe('Values and structures', function (): void {
     });
 
     it('preserves complete signed exponents', function (): void {
-        expect(json_decode(json_repair('{"key": 1e+5}'), true)['key'])->toBe(100000.0)
-            ->and(json_decode(json_repair('{"key": 1.5e-3}'), true)['key'])
-            ->toBe(0.0015);
+        expect(json_decode(json_repair('{"key": 1e+5}'), true))->toBe([
+            'key' => 100000.0,
+        ])
+            ->and(json_decode(json_repair('{"key": 1.5e-3}'), true))
+            ->toBe([
+                'key' => 0.0015,
+            ]);
     });
 
     it(
         'handles strings with special characters',
         function (string $input, string $expectedKey, string $expectedValue): void {
             $result = json_repair($input);
-            expect(json_validate($result))->toBeTrue();
-            $decoded = json_decode($result, true);
-            expect($decoded[$expectedKey])->toBe($expectedValue);
+            expect(json_validate($result))->toBeTrue()
+                ->and(json_decode($result, true))
+                ->toMatchArray([
+                    $expectedKey => $expectedValue,
+                ]);
         },
     )->with('special_characters');
 
     it('handles escape sequences', function (string $input, string $expectedValue): void {
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        $decoded = json_decode($result, true);
-        expect($decoded)->toBeArray()
-            ->toHaveKey('key')
-            ->and($decoded['key'])
-            ->toBe($expectedValue);
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'key' => $expectedValue,
+            ]);
     })->with('escape_sequences');
 
     it('handles advanced escaping cases', function (string $input, string $expected): void {
@@ -136,10 +153,11 @@ describe('Values and structures', function (): void {
         $result = json_repair("{'city':'上海'}");
         expect(json_validate($result))->toBeTrue()
             ->and($result)
-            ->toBe('{"city":"\u4e0a\u6d77"}');
-
-        $decoded = json_decode($result, true);
-        expect($decoded['city'])->toBe('上海');
+            ->toBe('{"city":"\u4e0a\u6d77"}')
+            ->and(json_decode($result, true))
+            ->toBe([
+                'city' => '上海',
+            ]);
     });
 
     it('handles unicode characters when ensureAscii is false', function (): void {
@@ -148,12 +166,11 @@ describe('Values and structures', function (): void {
         expect(json_validate($result))->toBeTrue()
             ->and($result)
             ->toContain('统一码')
-            ->toContain('test_中国人_ascii');
-
-        $decoded = json_decode($result, true);
-        expect($decoded)->toHaveKey('test_中国人_ascii')
-            ->and($decoded['test_中国人_ascii'])
-            ->toBe('统一码');
+            ->toContain('test_中国人_ascii')
+            ->and(json_decode($result, true))
+            ->toBe([
+                'test_中国人_ascii' => '统一码',
+            ]);
     });
 
     it('handles empty strings as values', function (string $input, string $expected): void {

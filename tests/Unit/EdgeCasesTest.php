@@ -34,34 +34,36 @@ describe('Edge cases and special features', function (): void {
     it('handles complex nested structures', function (): void {
         $input = '{"resourceType": "Bundle", "id": "1", "type": "collection", "entry": [{"resource": {"resourceType": "Patient", "id": "1", "name": [{"use": "official", "family": "Corwin", "given": ["Keisha", "Sunny"], "prefix": ["Mrs."}, {"use": "maiden", "family": "Goodwin", "given": ["Keisha", "Sunny"], "prefix": ["Mrs."]}]}}]}';
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-
-        $decoded = json_decode($result, true);
-        expect($decoded)->toBeArray()
-            ->toMatchArray([
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
                 'resourceType' => 'Bundle',
                 'id' => '1',
                 'type' => 'collection',
-            ])
-            ->and($decoded['entry'])
-            ->toBeArray()
-            ->and($decoded['entry'][0]['resource']['resourceType'])
-            ->toBe('Patient')
-            ->and($decoded['entry'][0]['resource']['name'])
-            ->toBeArray()
-            ->toHaveCount(1)
-            ->and($decoded['entry'][0]['resource']['name'][0])
-            ->toMatchArray([
-                'use' => 'official',
-                'family' => 'Corwin',
-                'given' => ['Keisha', 'Sunny'],
-            ])
-            ->and($decoded['entry'][0]['resource']['name'][0]['prefix'])
-            ->sequence(fn($e) => $e->toBe('Mrs.'), fn($e) => $e->toBeArray())
-            ->and($decoded['entry'][0]['resource']['name'][0]['prefix'][1])
-            ->toMatchArray([
-                'use' => 'maiden',
-                'family' => 'Goodwin',
+                'entry' => [
+                    [
+                        'resource' => [
+                            'resourceType' => 'Patient',
+                            'id' => '1',
+                            'name' => [
+                                [
+                                    'use' => 'official',
+                                    'family' => 'Corwin',
+                                    'given' => ['Keisha', 'Sunny'],
+                                    'prefix' => [
+                                        'Mrs.',
+                                        [
+                                            'use' => 'maiden',
+                                            'family' => 'Goodwin',
+                                            'given' => ['Keisha', 'Sunny'],
+                                            'prefix' => ['Mrs.'],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
             ]);
     });
 
@@ -71,11 +73,14 @@ describe('Edge cases and special features', function (): void {
 
         if ($expectedKey !== null) {
             $decoded = json_decode($result, true);
+            expect($decoded)->toBeArray();
+
+            if (! is_array($decoded)) {
+                return;
+            }
 
             if ($expectedValue !== null) {
                 expect($decoded[$expectedKey])->toBe($expectedValue);
-            } else {
-                expect($decoded)->toBeArray();
             }
         }
     })->with('multiple_json_objects');
@@ -87,7 +92,14 @@ describe('Edge cases and special features', function (): void {
             expect(json_validate($result))->toBeTrue();
 
             if ($expectedKey !== null) {
-                expect(json_decode($result, true)[$expectedKey])->toBe($expectedValue);
+                $decoded = json_decode($result, true);
+                expect($decoded)->toBeArray();
+
+                if (! is_array($decoded)) {
+                    return;
+                }
+
+                expect($decoded[$expectedKey])->toBe($expectedValue);
             }
         },
     )->with('markdown_code_blocks');

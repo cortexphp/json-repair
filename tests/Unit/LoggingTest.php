@@ -48,9 +48,17 @@ describe('Logging', function (): void {
         expect($logger->hasDebug('Converting single-quoted key to double quotes'))->toBeTrue()
             ->and(
                 $logger->hasDebugThatPasses(
-                    fn(array $record): bool => $record['message'] === 'Normalizing boolean/null value'
-        && $record['context']['from'] === 'True'
-        && $record['context']['to'] === 'true',
+                    function (array $record): bool {
+                        if ($record['message'] !== 'Normalizing boolean/null value') {
+                            return false;
+                        }
+
+                        $context = $record['context'] ?? null;
+
+                        return is_array($context)
+                            && ($context['from'] ?? null) === 'True'
+                            && ($context['to'] ?? null) === 'true';
+                    },
                 ),
             )
             ->toBeTrue()
@@ -89,9 +97,14 @@ describe('Logging', function (): void {
 
         // Verify that log entries include position and context
         expect($logger->hasDebugThatPasses(
-            fn(array $record): bool => isset($record['context']['position'])
-            && isset($record['context']['context'])
-            && str_contains((string) $record['context']['context'], '>>>'),
+            function (array $record): bool {
+                $context = $record['context'] ?? null;
+
+                return is_array($context)
+                    && isset($context['position'])
+                    && is_string($context['context'] ?? null)
+                    && str_contains($context['context'], '>>>');
+            },
         ))->toBeTrue();
     });
 

@@ -16,8 +16,10 @@ describe('API usage', function (): void {
         $repairer = new JsonRepairer("{'key': 'value'}");
         $result = $repairer->repair();
         expect(json_validate($result))->toBeTrue()
-            ->and(json_decode($result, true)['key'])
-            ->toBe('value');
+            ->and(json_decode($result, true))
+            ->toBe([
+                'key' => 'value',
+            ]);
     });
 
     it('can decode repaired JSON', function (): void {
@@ -210,10 +212,11 @@ describe('Duplicate key policy', function (): void {
 
         expect(json_validate($result))->toBeTrue()
             ->and($result)
-            ->toContain('12345678901234567890')->not->toContain('e+');
-
-        $decoded = json_decode($result, true);
-        expect($decoded['a'])->toBe(2);
+            ->toContain('12345678901234567890')->not->toContain('e+')
+            ->and(json_decode($result, true))
+            ->toMatchArray([
+                'a' => 2,
+            ]);
     });
 
     it('keeps first when skipped duplicate value is a structure containing brackets in strings', function (): void {

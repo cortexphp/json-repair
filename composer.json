@@ -47,7 +47,7 @@
         }
     },
     "scripts": {
-        "test": "pest",
+        "test": "pest --parallel",
         "benchmark": "phpbench run",
         "benchmark:base": "phpbench run --tag=base --progress=none",
         "benchmark:ci": "phpbench run --ref=base --report=aggregate --progress=none --assert=\"mode(variant.time.avg) <= mode(baseline.time.avg) +/- 15%\"",

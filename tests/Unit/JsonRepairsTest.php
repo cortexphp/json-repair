@@ -52,8 +52,10 @@ describe('JSON repairs', function (): void {
     it('repairs missing quotes around keys', function (): void {
         $result = json_repair('{key: "value"}');
         expect(json_validate($result))->toBeTrue()
-            ->and(json_decode($result, true)['key'])
-            ->toBe('value');
+            ->and(json_decode($result, true))
+            ->toBe([
+                'key' => 'value',
+            ]);
     });
 
     it('handles mixed single and double quotes', function (string $input, string $expected): void {
@@ -96,8 +98,10 @@ describe('JSON repairs', function (): void {
     it('repairs missing colons', function (): void {
         $result = json_repair('{"key" "value"}');
         expect(json_validate($result))->toBeTrue()
-            ->and(json_decode($result, true)['key'])
-            ->toBe('value');
+            ->and(json_decode($result, true))
+            ->toBe([
+                'key' => 'value',
+            ]);
     });
 
     it('repairs missing closing brackets', function (string $input, string $expected): void {
@@ -114,9 +118,20 @@ describe('JSON repairs', function (): void {
         $result = json_repair($input);
         expect(json_validate($result))->toBeTrue();
         $decoded = json_decode($result, true);
+        expect($decoded)->toBeArray();
+
+        if (! is_array($decoded)) {
+            return;
+        }
 
         $value = $decoded;
         foreach (explode('.', $expectedPath) as $key) {
+            expect($value)->toBeArray()->toHaveKey($key);
+
+            if (! is_array($value)) {
+                return;
+            }
+
             $value = $value[$key];
         }
 
@@ -136,11 +151,10 @@ describe('JSON repairs', function (): void {
     it('handles missing keys in objects', function (): void {
         $input = '{: "value"}';
         $result = json_repair($input);
-        expect(json_validate($result))->toBeTrue();
-        $decoded = json_decode($result, true);
-        expect($decoded)->toBeArray()
-            ->toHaveKey('value')
-            ->and($decoded['value'])
-            ->toBe('');
+        expect(json_validate($result))->toBeTrue()
+            ->and(json_decode($result, true))
+            ->toBe([
+                'value' => '',
+            ]);
     });
 });
